@@ -27,6 +27,7 @@ def run_async(coro, *, timeout: float | None = None):
     return asyncio.run(_runner())
 
 
+
 @celery.task(bind=True, name="health.ping")
 def ping(self):
     TASKS_TOTAL.labels(self.name, "started").inc()
