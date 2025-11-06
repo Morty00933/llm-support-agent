@@ -1,13 +1,8 @@
+"""Сервисы работы с базой знаний (upsert + поиск)."""
+
 from __future__ import annotations
 
-"""
-Сервис работы с базой знаний:
-- upsert_kb: простая вставка чанков (без UPSERT — для прод добавьте уникальные индексы + ON CONFLICT).
-- search_kb: семантический поиск — эмбеддинг запроса через Ollama и ранжирование по косинусу на стороне приложения.
-"""
-
-from typing import Sequence
-from sqlalchemy import select, insert
+from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..domain.models import KBChunk
@@ -36,7 +31,9 @@ async def upsert_kb(session: AsyncSession, tenant_id: int, data: KBUpsert) -> in
     return total
 
 
-async def search_kb(session: AsyncSession, tenant_id: int, query: str, limit: int = 5) -> list[dict]:
+async def search_kb(
+    session: AsyncSession, tenant_id: int, query: str, limit: int = 5
+) -> list[dict]:
     if not query.strip():
         return []
 
@@ -45,10 +42,17 @@ async def search_kb(session: AsyncSession, tenant_id: int, query: str, limit: in
 
     # Берём разумный верхний предел выборки — для прод лучше хранить векторно (pgvector) и фильтровать в SQL
     rows = (
-        await session.execute(
-            select(KBChunk).where(KBChunk.tenant_id == tenant_id).order_by(KBChunk.id.desc()).limit(2000)
+        (
+            await session.execute(
+                select(KBChunk)
+                .where(KBChunk.tenant_id == tenant_id)
+                .order_by(KBChunk.id.desc())
+                .limit(2000)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     scored: list[tuple[float, KBChunk]] = []
     for r in rows:

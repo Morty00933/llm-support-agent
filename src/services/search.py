@@ -1,8 +1,6 @@
-from __future__ import annotations
+"""Утилиты семантического поиска (косинусная близость)."""
 
-"""
-Утилиты семантического поиска (косинусная близость) над bytes<float32>.
-"""
+from __future__ import annotations
 
 import array
 import math

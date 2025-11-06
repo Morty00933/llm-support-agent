@@ -5,6 +5,7 @@ import sqlalchemy as sa
 revision = "0001_init"
 down_revision = None
 
+
 def upgrade():
     op.create_table(
         "tenants",
@@ -31,11 +32,20 @@ def upgrade():
     op.create_table(
         "messages",
         sa.Column("id", sa.Integer, primary_key=True),
-        sa.Column("ticket_id", sa.Integer, sa.ForeignKey("tickets.id"), nullable=False, index=True),
+        sa.Column(
+            "ticket_id",
+            sa.Integer,
+            sa.ForeignKey("tickets.id"),
+            nullable=False,
+            index=True,
+        ),
         sa.Column("role", sa.String(16), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
-        sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")),
+        sa.Column(
+            "created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()")
+        ),
     )
+
 
 def downgrade():
     op.drop_table("messages")

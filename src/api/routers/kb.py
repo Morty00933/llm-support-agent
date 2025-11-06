@@ -7,6 +7,7 @@ from ...services.knowledge import upsert_kb, search_kb
 
 router = APIRouter(prefix="/v1/kb", tags=["kb"])
 
+
 @router.post("/upsert")
 async def kb_upsert(
     body: KBUpsert,
@@ -17,6 +18,7 @@ async def kb_upsert(
         raise HTTPException(status_code=400, detail="chunks is empty")
     inserted = await upsert_kb(db, tenant, body)
     return {"inserted": inserted}
+
 
 @router.post("/search")
 async def kb_search(
