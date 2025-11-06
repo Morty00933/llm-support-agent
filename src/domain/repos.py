@@ -1,8 +1,17 @@
 from __future__ import annotations
-from typing import Iterable, Sequence, Optional, Any
+from typing import Any, Iterable, Optional, Sequence
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from .models import Tenant, User, Ticket, Message, KBChunk, TicketExternalRef
+
+from .models import (
+    Tenant,
+    User,
+    Ticket,
+    Message,
+    KBChunk,
+    TicketExternalRef,
+    IntegrationSyncLog,
+)
 
 
 # ---------- Tenants ----------
@@ -194,3 +203,24 @@ async def upsert_external_ref(
         session.add(ref)
     await session.flush()
     return ref
+
+
+async def record_integration_sync(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    ticket_id: int,
+    system: str,
+    status: str,
+    details: dict[str, Any] | None = None,
+) -> IntegrationSyncLog:
+    event = IntegrationSyncLog(
+        tenant_id=tenant_id,
+        ticket_id=ticket_id,
+        system=system,
+        status=status,
+        details_json=details,
+    )
+    session.add(event)
+    await session.flush()
+    return event

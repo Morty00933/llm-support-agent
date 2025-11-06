@@ -1,6 +1,8 @@
 from __future__ import annotations
 import asyncio
+
 from celery import Celery
+
 from .config import settings
 from .metrics import TASKS_TOTAL
 
@@ -16,13 +18,14 @@ celery.conf.result_expires = 3600
 celery.conf.worker_prefetch_multiplier = 1
 
 
-def run_async(coro):
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(coro)
+def run_async(coro, *, timeout: float | None = None):
+    async def _runner():
+        if timeout is not None:
+            return await asyncio.wait_for(coro, timeout=timeout)
+        return await coro
+
+    return asyncio.run(_runner())
+
 
 
 @celery.task(bind=True, name="health.ping")

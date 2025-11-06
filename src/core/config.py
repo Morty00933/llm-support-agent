@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     CELERY_BROKER_URL: str | None = None
     CELERY_RESULT_BACKEND: str | None = None
+    CELERY_TASK_TIMEOUT_SECONDS: int = 90
+    CELERY_TASK_MAX_RETRIES: int = 5
+    CELERY_TASK_RETRY_BACKOFF_MIN: int = 5
+    CELERY_TASK_RETRY_BACKOFF_MAX: int = 300
 
     # JWT
     JWT_SECRET: str = "change-me"

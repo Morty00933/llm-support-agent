@@ -1,4 +1,13 @@
-from .models import Base, Tenant, User, Ticket, Message, KBChunk, TicketExternalRef
+from .models import (
+    Base,
+    Tenant,
+    User,
+    Ticket,
+    Message,
+    KBChunk,
+    TicketExternalRef,
+    IntegrationSyncLog,
+)
 from . import repos
 
 __all__ = [
@@ -9,5 +18,6 @@ __all__ = [
     "Message",
     "KBChunk",
     "TicketExternalRef",
+    "IntegrationSyncLog",
     "repos",
 ]

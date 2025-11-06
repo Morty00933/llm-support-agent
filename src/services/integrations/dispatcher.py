@@ -4,14 +4,19 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
+import structlog
 from sqlalchemy import select
 
 from ...core.config import settings
 from ...core.db import SessionLocal
+from ...core.metrics import INTEGRATION_SYNC_TOTAL
 from ...domain.models import Ticket, Message
 from ...domain import repos
 from .jira import JiraClient, JiraError
 from .zendesk import ZendeskClient, ZendeskError
+
+
+logger = structlog.get_logger(__name__)
 
 
 async def _load_ticket_with_message(
@@ -70,7 +75,9 @@ async def _sync_jira(
     escalate: bool,
 ) -> dict[str, Any]:
     if not settings.JIRA_ENABLED:
-        return {"skipped": True, "reason": "jira disabled"}
+        result = {"skipped": True, "reason": "jira disabled"}
+        await _persist_sync_event(ticket, "jira", result)
+        return result
     if not all(
         [
             settings.JIRA_BASE_URL,
@@ -79,7 +86,9 @@ async def _sync_jira(
             settings.JIRA_PROJECT_KEY,
         ]
     ):
-        return {"skipped": True, "reason": "jira config incomplete"}
+        result = {"skipped": True, "reason": "jira config incomplete"}
+        await _persist_sync_event(ticket, "jira", result)
+        return result
 
     async with SessionLocal() as session:
         client = JiraClient(
@@ -126,6 +135,7 @@ async def _sync_jira(
                         result["transition_error"] = str(err)
         except JiraError as err:
             result = {"error": str(err)}
+        await _persist_sync_event(ticket, "jira", result, session=session)
         await session.commit()
         return result
 
@@ -138,7 +148,9 @@ async def _sync_zendesk(
     escalate: bool,
 ) -> dict[str, Any]:
     if not settings.ZENDESK_ENABLED:
-        return {"skipped": True, "reason": "zendesk disabled"}
+        result = {"skipped": True, "reason": "zendesk disabled"}
+        await _persist_sync_event(ticket, "zendesk", result)
+        return result
     if not all(
         [
             settings.ZENDESK_SUBDOMAIN,
@@ -146,7 +158,9 @@ async def _sync_zendesk(
             settings.ZENDESK_API_TOKEN,
         ]
     ):
-        return {"skipped": True, "reason": "zendesk config incomplete"}
+        result = {"skipped": True, "reason": "zendesk config incomplete"}
+        await _persist_sync_event(ticket, "zendesk", result)
+        return result
 
     async with SessionLocal() as session:
         client = ZendeskClient(
@@ -188,8 +202,57 @@ async def _sync_zendesk(
                 result = {"created": False, "id": ref.reference}
         except ZendeskError as err:
             result = {"error": str(err)}
+        await _persist_sync_event(ticket, "zendesk", result, session=session)
         await session.commit()
         return result
+
+
+def _classify_result(result: dict[str, Any]) -> str:
+    if result.get("error"):
+        return "error"
+    if result.get("skipped"):
+        return "skipped"
+    if any(key.endswith("_error") for key in result.keys()):
+        return "warning"
+    return "success"
+
+
+async def _persist_sync_event(
+    ticket: Ticket,
+    system: str,
+    result: dict[str, Any],
+    *,
+    session=None,
+):
+    status = _classify_result(result)
+    INTEGRATION_SYNC_TOTAL.labels(system, status).inc()
+    log = logger.bind(
+        tenant_id=ticket.tenant_id,
+        ticket_id=ticket.id,
+        system=system,
+        status=status,
+    )
+    log.info("integration_sync_result", details=result)
+    if session is None:
+        async with SessionLocal() as local_session:
+            await repos.record_integration_sync(
+                local_session,
+                tenant_id=ticket.tenant_id,
+                ticket_id=ticket.id,
+                system=system,
+                status=status,
+                details=result,
+            )
+            await local_session.commit()
+    else:
+        await repos.record_integration_sync(
+            session,
+            tenant_id=ticket.tenant_id,
+            ticket_id=ticket.id,
+            system=system,
+            status=status,
+            details=result,
+        )
 
 
 async def dispatch_ticket_sync(
@@ -200,17 +263,32 @@ async def dispatch_ticket_sync(
     kb_hits: Sequence[dict[str, Any]] | None,
     escalate: bool,
 ) -> dict[str, Any]:
-    if not (settings.JIRA_ENABLED or settings.ZENDESK_ENABLED):
-        return {"skipped": True, "reason": "no integrations enabled"}
-
     try:
         ticket, message, messages = await _load_ticket_with_message(
             ticket_id, tenant_id, message_id
         )
     except ValueError as err:
+        logger.warning(
+            "integration_sync_missing_ticket",
+            tenant_id=tenant_id,
+            ticket_id=ticket_id,
+            error=str(err),
+        )
         return {"error": str(err)}
 
+    if not (settings.JIRA_ENABLED or settings.ZENDESK_ENABLED):
+        noop = {"skipped": True, "reason": "no integrations enabled"}
+        await _persist_sync_event(ticket, "integrations", noop)
+        return noop
+
     conversation = _render_conversation(messages)
+    base_log = logger.bind(
+        tenant_id=tenant_id,
+        ticket_id=ticket_id,
+        message_id=message_id,
+        escalate=escalate,
+    )
+    base_log.info("integration_sync_start")
     results: dict[str, Any] = {}
     if settings.JIRA_ENABLED:
         results["jira"] = await _sync_jira(
@@ -220,4 +298,5 @@ async def dispatch_ticket_sync(
         results["zendesk"] = await _sync_zendesk(
             ticket, message, conversation, kb_hits, escalate
         )
+    base_log.info("integration_sync_complete", results=results)
     return results

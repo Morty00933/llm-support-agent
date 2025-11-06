@@ -177,3 +177,31 @@ Index(
     TicketExternalRef.system,
     unique=True,
 )
+
+
+class IntegrationSyncLog(Base):
+    __tablename__ = "integration_sync_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
+    ticket_id: Mapped[int] = mapped_column(
+        ForeignKey("tickets.id", ondelete="CASCADE"), index=True
+    )
+    system: Mapped[str] = mapped_column(String(32), index=True)
+    status: Mapped[str] = mapped_column(String(16), index=True)
+    details_json: Mapped[dict[str, Any] | None] = mapped_column(
+        "details", JSONB, nullable=True
+    )
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+Index(
+    "ix_integration_sync_logs_ticket_system",
+    IntegrationSyncLog.ticket_id,
+    IntegrationSyncLog.system,
+    IntegrationSyncLog.created_at,
+)

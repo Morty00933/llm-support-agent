@@ -19,3 +19,9 @@ TASKS_TOTAL = Counter(
     "Total Celery tasks",
     ["name", "status"],
 )
+
+INTEGRATION_SYNC_TOTAL = Counter(
+    "integration_sync_total",
+    "External integration sync results",
+    ["system", "status"],
+)
