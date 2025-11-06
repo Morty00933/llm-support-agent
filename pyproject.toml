@@ -27,6 +27,7 @@ dependencies = [
   "redis>=5.0",
   "httpx>=0.27",           # Ollama HTTP API
   "orjson>=3.10",
+  "pgvector[sqlalchemy]>=0.2",
 ]
 
 [tool.setuptools]

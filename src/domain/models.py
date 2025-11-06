@@ -13,6 +13,53 @@ from sqlalchemy import (
     LargeBinary,
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.types import UserDefinedType
+
+try:  # pragma: no cover - optional dependency
+    from pgvector.sqlalchemy import Vector
+
+    HAS_PGVECTOR = True
+except ModuleNotFoundError:  # pragma: no cover - fallback stub for local/dev envs
+    HAS_PGVECTOR = False
+
+    class Vector(UserDefinedType):
+        """Минимальная заглушка для поля vector, когда pgvector не установлен."""
+
+        cache_ok = True
+
+        def __init__(self, dim: int | None = None) -> None:
+            super().__init__()
+            self.dim = dim
+
+        def get_col_spec(self, **kw: Any) -> str:
+            if self.dim:
+                return f"vector({self.dim})"
+            return "vector"
+
+        def bind_processor(self, dialect):
+            def process(value):
+                if value is None:
+                    return None
+                return "[" + ",".join(str(float(v)) for v in value) + "]"
+
+            return process
+
+        def result_processor(self, dialect, coltype):
+            def process(value):
+                if value is None:
+                    return None
+                text = value.strip()
+                if text.startswith("[") and text.endswith("]"):
+                    text = text[1:-1]
+                if not text:
+                    return []
+                return [float(part) for part in text.split(",")]
+
+            return process
+
+        class comparator_factory(UserDefinedType.Comparator):
+            def cosine_distance(self, other):  # type: ignore[override]
+                return func.cosine_distance(self.expr, other)
 
 
 class Base(DeclarativeBase):
@@ -73,6 +120,9 @@ class KBChunk(Base):
     chunk: Mapped[str] = mapped_column(Text())
     chunk_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     embedding: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    embedding_vector: Mapped[list[float] | None] = mapped_column(
+        Vector(None), nullable=True
+    )
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
         "metadata", JSONB, nullable=True
     )
@@ -81,6 +131,9 @@ class KBChunk(Base):
     )
     updated_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+    archived_at: Mapped[DateTime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
 

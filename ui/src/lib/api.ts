@@ -70,6 +70,7 @@ export type KBSearchRequest = {
   tags?: string[];
   language?: string | null;
   include_metadata?: boolean;
+  include_archived?: boolean;
 };
 
 export type KBSearchHit = {
@@ -77,7 +78,30 @@ export type KBSearchHit = {
   source: string;
   chunk: string;
   score: number;
+  similarity: number;
+  archived: boolean;
+  updated_at?: string;
+  archived_at?: string;
   metadata?: Record<string, unknown> | null;
+};
+
+export type KBArchiveRequest = {
+  ids?: number[];
+  source?: string;
+  before?: string;
+  archived?: boolean;
+};
+
+export type KBDeleteRequest = {
+  ids?: number[];
+  source?: string;
+};
+
+export type KBReindexRequest = {
+  ids?: number[];
+  source?: string;
+  include_archived?: boolean;
+  batch_size?: number;
 };
 
 export const KBAPI = {
@@ -90,6 +114,21 @@ export const KBAPI = {
     request<{ results: KBSearchHit[] }>("/kb/search", {
       method: "POST",
       body: JSON.stringify({ include_metadata: true, limit: 5, ...payload })
+    }),
+  archive: (payload: KBArchiveRequest) =>
+    request<{ summary: { updated: number } }>("/kb/archive", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  remove: (payload: KBDeleteRequest) =>
+    request<{ summary: { deleted: number } }>("/kb/delete", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  reindex: (payload: KBReindexRequest) =>
+    request<{ summary: { processed: number } }>("/kb/reindex", {
+      method: "POST",
+      body: JSON.stringify(payload)
     })
 };
 
