@@ -1,12 +1,10 @@
+"""Лёгкий клиент Jira Cloud/Server (REST API v3 совместимо с Cloud)."""
+
 from __future__ import annotations
 
-"""
-Лёгкий клиент Jira Cloud/Server (REST API v3 совместимо с Cloud).
-Аутентификация: Basic (email + API token).
-"""
-
-from typing import Any, Dict, Optional
 import base64
+from typing import Any, Dict, Optional
+
 import httpx
 
 
@@ -15,7 +13,9 @@ class JiraError(RuntimeError):
 
 
 class JiraClient:
-    def __init__(self, base_url: str, email: str, api_token: str, timeout: float = 30.0):
+    def __init__(
+        self, base_url: str, email: str, api_token: str, timeout: float = 30.0
+    ):
         """
         base_url: например, https://your-domain.atlassian.net
         """
@@ -29,10 +29,14 @@ class JiraClient:
             **self._auth_header,
         }
 
-    async def _request(self, method: str, path: str, json: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def _request(
+        self, method: str, path: str, json: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         url = f"{self.base_url}{path}"
         async with httpx.AsyncClient(timeout=self.timeout) as client:
-            r = await client.request(method, url, json=json, headers=self._common_headers)
+            r = await client.request(
+                method, url, json=json, headers=self._common_headers
+            )
             if r.status_code >= 400:
                 try:
                     detail = r.json()
@@ -71,8 +75,14 @@ class JiraClient:
 
     async def add_comment(self, issue_key: str, comment: str) -> Dict[str, Any]:
         payload = {"body": comment}
-        return await self._request("POST", f"/rest/api/3/issue/{issue_key}/comment", json=payload)
+        return await self._request(
+            "POST", f"/rest/api/3/issue/{issue_key}/comment", json=payload
+        )
 
-    async def transition_issue(self, issue_key: str, transition_id: str) -> Dict[str, Any]:
+    async def transition_issue(
+        self, issue_key: str, transition_id: str
+    ) -> Dict[str, Any]:
         payload = {"transition": {"id": transition_id}}
-        return await self._request("POST", f"/rest/api/3/issue/{issue_key}/transitions", json=payload)
+        return await self._request(
+            "POST", f"/rest/api/3/issue/{issue_key}/transitions", json=payload
+        )

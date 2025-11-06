@@ -42,18 +42,94 @@ export const AuthAPI = {
 };
 
 // ---- KB
-export type KBChunkIn = { content: string };
+export type KBChunkIn = {
+  content: string;
+  language?: string | null;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+};
+
+export type KBUpsertRequest = {
+  source: string;
+  chunks: KBChunkIn[];
+  default_language?: string | null;
+  default_tags?: string[];
+};
+
+export type KBUpsertSummary = {
+  created: number;
+  updated: number;
+  skipped: number;
+  processed?: number;
+};
+
+export type KBSearchRequest = {
+  query: string;
+  limit?: number;
+  source?: string;
+  tags?: string[];
+  language?: string | null;
+  include_metadata?: boolean;
+  include_archived?: boolean;
+};
+
+export type KBSearchHit = {
+  id: number;
+  source: string;
+  chunk: string;
+  score: number;
+  similarity: number;
+  archived: boolean;
+  updated_at?: string;
+  archived_at?: string;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type KBArchiveRequest = {
+  ids?: number[];
+  source?: string;
+  before?: string;
+  archived?: boolean;
+};
+
+export type KBDeleteRequest = {
+  ids?: number[];
+  source?: string;
+};
+
+export type KBReindexRequest = {
+  ids?: number[];
+  source?: string;
+  include_archived?: boolean;
+  batch_size?: number;
+};
+
 export const KBAPI = {
-  upsert: (source: string, chunks: KBChunkIn[]) =>
-    request<{ inserted: number }>("/kb/upsert", {
+  upsert: (payload: KBUpsertRequest) =>
+    request<{ summary: KBUpsertSummary }>("/kb/upsert", {
       method: "POST",
-      body: JSON.stringify({ source, chunks })
+      body: JSON.stringify(payload)
     }),
-  search: (query: string, limit = 5) =>
-    request<{ results: { id: number; source: string; chunk: string; score: number }[] }>(
-      "/kb/search",
-      { method: "POST", body: JSON.stringify({ query, limit }) }
-    )
+  search: (payload: KBSearchRequest) =>
+    request<{ results: KBSearchHit[] }>("/kb/search", {
+      method: "POST",
+      body: JSON.stringify({ include_metadata: true, limit: 5, ...payload })
+    }),
+  archive: (payload: KBArchiveRequest) =>
+    request<{ summary: { updated: number } }>("/kb/archive", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  remove: (payload: KBDeleteRequest) =>
+    request<{ summary: { deleted: number } }>("/kb/delete", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }),
+  reindex: (payload: KBReindexRequest) =>
+    request<{ summary: { processed: number } }>("/kb/reindex", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    })
 };
 
 // ---- Tickets
