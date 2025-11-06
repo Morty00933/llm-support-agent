@@ -20,6 +20,7 @@ async def kb_upsert(
     return {"summary": stats}
 
 
+
 @router.post("/search")
 async def kb_search(
     body: KBSearchIn,
