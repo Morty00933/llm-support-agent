@@ -21,14 +21,17 @@ app.add_middleware(
 # Метрики/счётчики
 setup_middlewares(app)
 
+
 @app.get("/health", response_class=PlainTextResponse)
 async def health():
     return "ok"
+
 
 @app.get("/metrics")
 def metrics():
     data = generate_latest()
     return Response(content=data, media_type=CONTENT_TYPE_LATEST)
+
 
 # Подключение роутеров
 app.include_router(r.admin.router)

@@ -13,6 +13,7 @@ engine = create_async_engine(
 )
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
+
 @contextlib.asynccontextmanager
 async def get_session() -> AsyncIterator[AsyncSession]:
     async with SessionLocal() as session:
@@ -22,6 +23,7 @@ async def get_session() -> AsyncIterator[AsyncSession]:
         except Exception:
             await session.rollback()
             raise
+
 
 async def run_migrations() -> None:
     # миграции выполняем отдельным контейнером "migrate"

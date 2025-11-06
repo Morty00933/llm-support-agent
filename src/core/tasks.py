@@ -15,6 +15,7 @@ celery.conf.task_track_started = True
 celery.conf.result_expires = 3600
 celery.conf.worker_prefetch_multiplier = 1
 
+
 def run_async(coro):
     try:
         loop = asyncio.get_event_loop()
@@ -23,6 +24,7 @@ def run_async(coro):
         asyncio.set_event_loop(loop)
     return loop.run_until_complete(coro)
 
+
 @celery.task(bind=True, name="health.ping")
 def ping(self):
     TASKS_TOTAL.labels(self.name, "started").inc()
@@ -30,3 +32,6 @@ def ping(self):
         return "pong"
     finally:
         TASKS_TOTAL.labels(self.name, "succeeded").inc()
+
+
+celery_app = celery

@@ -1,17 +1,16 @@
+"""Эмбеддинги через Ollama /api/embeddings."""
+
 from __future__ import annotations
 
-"""
-Эмбеддинги через Ollama /api/embeddings.
-Возвращаем список векторов, упакованных в bytes<float32> (array('f').tobytes()).
-"""
-
-from typing import Iterable, List
 import array
+from typing import Iterable
+
 import httpx
+
 from ..core.config import settings
 
 
-async def embed_texts(texts: Iterable[str]) -> List[bytes]:
+async def embed_texts(texts: Iterable[str]) -> list[bytes]:
     out: list[bytes] = []
     base = settings.OLLAMA_HOST.rstrip("/")
     model = settings.OLLAMA_MODEL_EMBED
