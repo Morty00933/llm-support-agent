@@ -1,0 +1,53 @@
+version: "3.9"
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    ports: ["80:80"]
+    depends_on: [api]
+  api:
+    build: .
+    environment:
+      ENV: prod
+      LOG_LEVEL: INFO
+      POSTGRES_DSN: ${POSTGRES_DSN}
+      REDIS_URL: ${REDIS_URL}
+      BROKER_URL: ${BROKER_URL}
+      RESULT_BACKEND: ${RESULT_BACKEND}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      SENTRY_DSN: ${SENTRY_DSN}
+    deploy:
+      replicas: 2
+  worker:
+    build: .
+    command: celery -A core.tasks.celery_app worker -Q default,high,low,dlq --loglevel=INFO --concurrency=8
+    environment:
+      POSTGRES_DSN: ${POSTGRES_DSN}
+      REDIS_URL: ${REDIS_URL}
+      BROKER_URL: ${BROKER_URL}
+      RESULT_BACKEND: ${RESULT_BACKEND}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    deploy:
+      replicas: 4
+  beat:
+    build: .
+    command: celery -A core.tasks.celery_app beat --loglevel=INFO
+    environment:
+      BROKER_URL: ${BROKER_URL}
+      RESULT_BACKEND: ${RESULT_BACKEND}
+      POSTGRES_DSN: ${POSTGRES_DSN}
+  prometheus:
+    image: prom/prometheus
+    volumes: [./ops/prometheus.yml:/etc/prometheus/prometheus.yml:ro]
+    ports: ["9090:9090"]
+  loki:
+    image: grafana/loki:2.9.3
+    command: -config.file=/etc/loki/config.yaml
+    volumes: [./ops/loki-config.yaml:/etc/loki/config.yaml:ro]
+    ports: ["3100:3100"]
+  grafana:
+    image: grafana/grafana:11.2.0
+    ports: ["3000:3000"]
+    depends_on: [prometheus, loki]

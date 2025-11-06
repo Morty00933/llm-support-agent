@@ -1,0 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --bg:#f8fafc; --fg:#0f172a; --muted:#475569; --pri:#2563eb; --br:#e2e8f0; }
+html, body, #root { height: 100%; }
