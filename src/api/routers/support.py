@@ -8,11 +8,14 @@ from ...agent.loop import Agent, AgentResult
 
 router = APIRouter(prefix="/v1/support", tags=["support"])
 
+
 class AgentAnswerIn(BaseModel):
     """Свободная форма запроса к агенту (без привязки к тикету)."""
+
     query: str
     kb_limit: int = 5
     temperature: float = 0.2
+
 
 class AgentAnswerOut(BaseModel):
     reply: str
@@ -20,6 +23,7 @@ class AgentAnswerOut(BaseModel):
     kb_hits: list[dict]
     escalated: bool
     reason: str
+
 
 @router.post("/answer", response_model=AgentAnswerOut)
 async def answer_freeform(
@@ -37,6 +41,7 @@ async def answer_freeform(
     )
     return AgentAnswerOut(**res.__dict__)
 
+
 class TicketAnswerOut(BaseModel):
     reply: str
     used_context: str | None
@@ -45,12 +50,15 @@ class TicketAnswerOut(BaseModel):
     reason: str
     saved_message_id: int | None = None
 
+
 @router.post("/tickets/{ticket_id}/answer", response_model=TicketAnswerOut)
 async def answer_for_ticket(
     ticket_id: int,
     db: AsyncSession = Depends(get_db),
     tenant: int = Depends(tenant_dep),
-    save: bool = Query(True, description="Сохранить ответ ассистента в сообщения тикета"),
+    save: bool = Query(
+        True, description="Сохранить ответ ассистента в сообщения тикета"
+    ),
     temperature: float = Query(0.2, ge=0, le=2.0),
     kb_limit: int = Query(5, ge=1, le=20),
 ):

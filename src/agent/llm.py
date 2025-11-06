@@ -21,7 +21,12 @@ class OllamaChat:
     }
     """
 
-    def __init__(self, base_url: str | None = None, model: str | None = None, timeout: float = 120.0):
+    def __init__(
+        self,
+        base_url: str | None = None,
+        model: str | None = None,
+        timeout: float = 120.0,
+    ):
         self.base_url = (base_url or settings.OLLAMA_HOST).rstrip("/")
         self.model = model or settings.OLLAMA_MODEL_CHAT
         self.timeout = timeout

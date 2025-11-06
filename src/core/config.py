@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     APP_VERSION: str = "0.2.0"
 
     # HTTP
-    CORS_ORIGINS: str = Field(default="*")      # comma-separated
-    TRUSTED_HOSTS: str = Field(default="*")     # comma-separated
+    CORS_ORIGINS: str = Field(default="*")  # comma-separated
+    TRUSTED_HOSTS: str = Field(default="*")  # comma-separated
 
     # DB
     DB_HOST: str = "db"

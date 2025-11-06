@@ -17,6 +17,7 @@ if config.config_file_name is not None:
 
 # --- Помощники ---------------------------------------------------------------
 
+
 def _ensure_project_on_path() -> None:
     """
     Добавляет корень проекта в PYTHONPATH, чтобы работал import src.*
@@ -26,15 +27,18 @@ def _ensure_project_on_path() -> None:
     if root not in sys.path:
         sys.path.insert(0, root)
 
+
 def _get_settings_url_fallback() -> Optional[str]:
     """
     Пытаемся импортировать DSN из src.core.config.settings.
     """
     try:
         from src.core.config import settings  # type: ignore
+
         return settings.SQLALCHEMY_DATABASE_URI
     except Exception:
         return None
+
 
 def _to_sync_driver(url: str) -> str:
     """
@@ -44,6 +48,7 @@ def _to_sync_driver(url: str) -> str:
     if url.startswith("postgresql+asyncpg://"):
         return "postgresql+psycopg://" + url.split("postgresql+asyncpg://", 1)[1]
     return url
+
 
 # --- Определяем SQLALCHEMY URL ----------------------------------------------
 
@@ -70,12 +75,14 @@ config.set_main_option("sqlalchemy.url", sync_url)
 
 try:
     from src.domain.models import Base  # type: ignore
+
     target_metadata = Base.metadata
 except Exception:
     # Если не используете autogenerate, можно оставить None
     target_metadata = None
 
 # --- Конфигурация context.configure -----------------------------------------
+
 
 def run_migrations_offline() -> None:
     """

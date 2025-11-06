@@ -5,7 +5,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..domain.models import Ticket, Message
-from ..core.config import settings
 from .llm import OllamaChat
 from .policies import (
     build_system_prompt,
@@ -21,11 +20,12 @@ class AgentResult:
     """
     Результат работы агента.
     """
-    reply: str                      # Сгенерированный ответ ассистента
-    used_context: str | None        # Текстовый контекст (слип из KB), если был
-    kb_hits: list[dict]             # Сырые документы из поиска по KB
-    escalated: bool                 # Нужно ли эскалировать
-    reason: str                     # Пояснение решения/идеи
+
+    reply: str  # Сгенерированный ответ ассистента
+    used_context: str | None  # Текстовый контекст (слип из KB), если был
+    kb_hits: list[dict]  # Сырые документы из поиска по KB
+    escalated: bool  # Нужно ли эскалировать
+    reason: str  # Пояснение решения/идеи
 
 
 class Agent:
@@ -40,23 +40,38 @@ class Agent:
     # ---------- Вспомогательные сборщики контекста ----------
 
     @staticmethod
-    async def _load_ticket(session: AsyncSession, tenant_id: int, ticket_id: int) -> Ticket:
+    async def _load_ticket(
+        session: AsyncSession, tenant_id: int, ticket_id: int
+    ) -> Ticket:
         t = await session.get(Ticket, ticket_id)
         if not t or t.tenant_id != tenant_id:
             raise ValueError("ticket not found or tenant mismatch")
         return t
 
     @staticmethod
-    async def _load_messages(session: AsyncSession, ticket_id: int, limit: int = 50) -> list[Message]:
+    async def _load_messages(
+        session: AsyncSession, ticket_id: int, limit: int = 50
+    ) -> list[Message]:
         rows = (
-            await session.execute(
-                select(Message).where(Message.ticket_id == ticket_id).order_by(Message.id.asc()).limit(limit)
+            (
+                await session.execute(
+                    select(Message)
+                    .where(Message.ticket_id == ticket_id)
+                    .order_by(Message.id.asc())
+                    .limit(limit)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return list(rows)
 
     @staticmethod
-    def _messages_to_prompt(messages: Sequence[Message], max_chars_each: int = 1500, max_total_chars: int = 6000) -> str:
+    def _messages_to_prompt(
+        messages: Sequence[Message],
+        max_chars_each: int = 1500,
+        max_total_chars: int = 6000,
+    ) -> str:
         """
         Конвертирует историю сообщений тикета в компактный текст для LLM.
         """
@@ -113,14 +128,18 @@ class Agent:
         history = await self._load_messages(session, ticket_id)
 
         # Собираем поисковый запрос из заголовка + последнего user-сообщения, если есть
-        last_user = next((m for m in reversed(history) if m.role.lower() == "user"), None)
+        last_user = next(
+            (m for m in reversed(history) if m.role.lower() == "user"), None
+        )
         query = ticket.title
         if last_user:
             query = f"{ticket.title}. {last_user.content}"
 
         # Инструмент поиска по KB
         search_kb = get_tool("search_kb")
-        kb_hits: list[dict] = await search_kb(tenant_id=tenant_id, query=query, limit=kb_limit, session=session)
+        kb_hits: list[dict] = await search_kb(
+            tenant_id=tenant_id, query=query, limit=kb_limit, session=session
+        )
 
         # Контекст для системного промпта
         kb_context = self._kb_hits_to_context(kb_hits) if kb_hits else ""
@@ -137,7 +156,9 @@ class Agent:
         reply = await self.chat.chat(messages, temperature=temperature)
 
         escalated = should_escalate(conversation_compact) or should_escalate(reply)
-        reason = "Escalation keywords detected" if escalated else "Direct answer generated"
+        reason = (
+            "Escalation keywords detected" if escalated else "Direct answer generated"
+        )
 
         return AgentResult(
             reply=reply.strip(),
@@ -160,7 +181,9 @@ class Agent:
         Ответ «без тикета»: запрос пользователя → поиск по KB → LLM.
         """
         search_kb = get_tool("search_kb")
-        kb_hits: list[dict] = await search_kb(tenant_id=tenant_id, query=query, limit=kb_limit, session=session)
+        kb_hits: list[dict] = await search_kb(
+            tenant_id=tenant_id, query=query, limit=kb_limit, session=session
+        )
         kb_context = self._kb_hits_to_context(kb_hits) if kb_hits else ""
         system_prompt = build_system_prompt(kb_context or None)
 
@@ -171,7 +194,9 @@ class Agent:
 
         reply = await self.chat.chat(messages, temperature=temperature)
         escalated = should_escalate(query) or should_escalate(reply)
-        reason = "Escalation keywords detected" if escalated else "Direct answer generated"
+        reason = (
+            "Escalation keywords detected" if escalated else "Direct answer generated"
+        )
 
         return AgentResult(
             reply=reply.strip(),
