@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from ..core.config import settings
 
@@ -24,13 +23,13 @@ def _init_sentry() -> bool:
         from sentry_sdk.integrations.fastapi import FastApiIntegration  # type: ignore
 
         sentry_logging = LoggingIntegration(
-            level=logging.INFO,        # breadcrumbs
-            event_level=logging.ERROR  # отправлять события с ERROR и выше
+            level=logging.INFO,  # breadcrumbs
+            event_level=logging.ERROR,  # отправлять события с ERROR и выше
         )
 
         sentry_sdk.init(
             dsn=dsn,
-            traces_sample_rate=0.2,    # APM, подстрой при необходимости
+            traces_sample_rate=0.2,  # APM, подстрой при необходимости
             profiles_sample_rate=0.0,  # профайлинг выключен по умолчанию
             integrations=[
                 sentry_logging,
@@ -75,7 +74,9 @@ def _init_opentelemetry() -> bool:
         provider = TracerProvider(resource=resource)
         trace.set_tracer_provider(provider)
 
-        exporter = OTLPSpanExporter()  # читает конфиг из env, например OTEL_EXPORTER_OTLP_ENDPOINT
+        exporter = (
+            OTLPSpanExporter()
+        )  # читает конфиг из env, например OTEL_EXPORTER_OTLP_ENDPOINT
         processor = BatchSpanProcessor(exporter, max_export_batch_size=512)
         provider.add_span_processor(processor)
 

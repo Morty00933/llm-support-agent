@@ -1,18 +1,26 @@
+"""Эмбеддинги через Ollama /api/embeddings."""
+
 from __future__ import annotations
 
-"""
-Эмбеддинги через Ollama /api/embeddings.
-Возвращаем список векторов, упакованных в bytes<float32> (array('f').tobytes()).
-"""
-
-from typing import Iterable, List
 import array
+from dataclasses import dataclass
+from typing import Iterable
+
 import httpx
+
 from ..core.config import settings
 
 
-async def embed_texts(texts: Iterable[str]) -> List[bytes]:
-    out: list[bytes] = []
+@dataclass(slots=True)
+class EmbeddingResult:
+    """Результат вызова Ollama embeddings."""
+
+    vector: list[float]
+    buffer: bytes
+
+
+async def embed_texts(texts: Iterable[str]) -> list[EmbeddingResult]:
+    out: list[EmbeddingResult] = []
     base = settings.OLLAMA_HOST.rstrip("/")
     model = settings.OLLAMA_MODEL_EMBED
 
@@ -25,5 +33,5 @@ async def embed_texts(texts: Iterable[str]) -> List[bytes]:
             r.raise_for_status()
             vec = r.json()["embedding"]  # list[float]
             arr = array.array("f", vec)  # float32
-            out.append(arr.tobytes())
+            out.append(EmbeddingResult(vector=list(vec), buffer=arr.tobytes()))
     return out

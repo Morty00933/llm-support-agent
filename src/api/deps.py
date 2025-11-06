@@ -6,10 +6,12 @@ from jose import jwt, JWTError
 from ..core.db import get_session
 from ..core.config import settings
 
+
 async def get_db() -> AsyncSession:
     """Dependency: выдать async-сессию БД с автокоммитом/автороллбеком."""
     async with get_session() as s:
         yield s
+
 
 def _decode_jwt(token: str) -> dict:
     try:
@@ -25,6 +27,7 @@ def _decode_jwt(token: str) -> dict:
     except JWTError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
+
 async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
     """Парсит и валидирует Bearer JWT из заголовка Authorization."""
     if not authorization:
@@ -33,6 +36,7 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
     if scheme.lower() != "bearer" or not token:
         raise HTTPException(status_code=401, detail="Invalid auth scheme")
     return _decode_jwt(token)
+
 
 async def tenant_dep(
     user: dict = Depends(get_current_user),

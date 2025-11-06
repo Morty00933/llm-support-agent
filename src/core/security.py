@@ -7,14 +7,21 @@ from .config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
+
 
 def verify_password(password: str, hashed: str) -> bool:
     return pwd_context.verify(password, hashed)
 
-def create_access_token(subject: str, tenant: int, expires_minutes: Optional[int] = None) -> str:
-    exp = datetime.now(tz=timezone.utc) + timedelta(minutes=expires_minutes or settings.JWT_EXPIRE_MIN)
+
+def create_access_token(
+    subject: str, tenant: int, expires_minutes: Optional[int] = None
+) -> str:
+    exp = datetime.now(tz=timezone.utc) + timedelta(
+        minutes=expires_minutes or settings.JWT_EXPIRE_MIN
+    )
     payload = {
         "sub": subject,
         "tenant": tenant,
