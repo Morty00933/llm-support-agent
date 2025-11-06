@@ -32,3 +32,6 @@ def ping(self):
         return "pong"
     finally:
         TASKS_TOTAL.labels(self.name, "succeeded").inc()
+
+
+celery_app = celery

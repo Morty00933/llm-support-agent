@@ -1,8 +1,8 @@
 from __future__ import annotations
-from typing import Iterable, Sequence, Optional
+from typing import Iterable, Sequence, Optional, Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from .models import Tenant, User, Ticket, Message, KBChunk
+from .models import Tenant, User, Ticket, Message, KBChunk, TicketExternalRef
 
 
 # ---------- Tenants ----------
@@ -150,3 +150,47 @@ async def list_kb_chunks(
     if source:
         q = q.where(KBChunk.source == source)
     return (await session.execute(q)).scalars().all()
+
+
+# ---------- External integrations ----------
+
+
+async def get_external_ref(
+    session: AsyncSession, ticket_id: int, system: str
+) -> Optional[TicketExternalRef]:
+    q = (
+        select(TicketExternalRef)
+        .where(
+            TicketExternalRef.ticket_id == ticket_id,
+            TicketExternalRef.system == system,
+        )
+        .limit(1)
+    )
+    return (await session.execute(q)).scalars().first()
+
+
+async def upsert_external_ref(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+    ticket_id: int,
+    system: str,
+    reference: str,
+    metadata: dict[str, Any] | None = None,
+) -> TicketExternalRef:
+    ref = await get_external_ref(session, ticket_id, system)
+    if ref:
+        ref.reference = reference
+        if metadata is not None:
+            ref.metadata_json = metadata
+    else:
+        ref = TicketExternalRef(
+            tenant_id=tenant_id,
+            ticket_id=ticket_id,
+            system=system,
+            reference=reference,
+            metadata_json=metadata,
+        )
+        session.add(ref)
+    await session.flush()
+    return ref

@@ -45,6 +45,22 @@ class Settings(BaseSettings):
     PROMETHEUS_ENABLED: bool = True
     SENTRY_DSN: str | None = None
 
+    # Integrations — Jira
+    JIRA_ENABLED: bool = False
+    JIRA_BASE_URL: str | None = None
+    JIRA_EMAIL: str | None = None
+    JIRA_API_TOKEN: str | None = None
+    JIRA_PROJECT_KEY: str | None = None
+    JIRA_ISSUE_TYPE: str = "Task"
+    JIRA_ESCALATION_TRANSITION: str | None = None
+
+    # Integrations — Zendesk
+    ZENDESK_ENABLED: bool = False
+    ZENDESK_SUBDOMAIN: str | None = None
+    ZENDESK_EMAIL: str | None = None
+    ZENDESK_API_TOKEN: str | None = None
+    ZENDESK_DEFAULT_PRIORITY: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

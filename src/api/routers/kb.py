@@ -16,8 +16,9 @@ async def kb_upsert(
 ):
     if not body.chunks:
         raise HTTPException(status_code=400, detail="chunks is empty")
-    inserted = await upsert_kb(db, tenant, body)
-    return {"inserted": inserted}
+    stats = await upsert_kb(db, tenant, body)
+    return {"summary": stats}
+
 
 
 @router.post("/search")
@@ -26,5 +27,5 @@ async def kb_search(
     db: AsyncSession = Depends(get_db),
     tenant: int = Depends(tenant_dep),
 ):
-    results = await search_kb(db, tenant, body.query, body.limit)
+    results = await search_kb(db, tenant, body.query, body.limit, filters=body)
     return {"results": results}

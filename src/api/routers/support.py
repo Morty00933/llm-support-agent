@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..deps import get_db, tenant_dep
 from ...domain.models import Ticket, Message
 from ...agent.loop import Agent, AgentResult
+from ...core.config import settings
+from ...tasks.agent_tasks import sync_ticket_task
 
 router = APIRouter(prefix="/v1/support", tags=["support"])
 
@@ -82,6 +84,14 @@ async def answer_for_ticket(
         db.add(m)
         await db.flush()
         saved_id = m.id
+        if settings.JIRA_ENABLED or settings.ZENDESK_ENABLED:
+            sync_ticket_task.delay(
+                ticket_id=t.id,
+                tenant_id=tenant,
+                message_id=saved_id,
+                escalate=res.escalated,
+                kb_hits=res.kb_hits,
+            )
 
     return TicketAnswerOut(
         reply=res.reply,

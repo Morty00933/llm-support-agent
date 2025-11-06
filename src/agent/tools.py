@@ -5,6 +5,7 @@ from typing import Protocol, Any, Optional, Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..schemas.kb import KBSearchIn
 from ..services.knowledge import search_kb
 from .llm import OllamaChat
 
@@ -75,6 +76,10 @@ class SearchKBTool:
         query: str,
         limit: int = 5,
         session: Optional[AsyncSession] = None,
+        source: str | None = None,
+        tags: list[str] | None = None,
+        language: str | None = None,
+        include_metadata: bool = True,
     ) -> list[dict]:
         if session is None:
             if not self._session_getter:
@@ -84,7 +89,15 @@ class SearchKBTool:
             session = self._session_getter()
         if not query:
             return []
-        return await search_kb(session, tenant_id, query, limit)
+        filters = KBSearchIn(
+            query=query,
+            limit=limit,
+            source=source,
+            tags=tags,
+            language=language,
+            include_metadata=include_metadata,
+        )
+        return await search_kb(session, tenant_id, query, limit, filters=filters)
 
 
 @dataclass

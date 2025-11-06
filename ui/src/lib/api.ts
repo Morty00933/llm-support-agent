@@ -42,18 +42,55 @@ export const AuthAPI = {
 };
 
 // ---- KB
-export type KBChunkIn = { content: string };
+export type KBChunkIn = {
+  content: string;
+  language?: string | null;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+};
+
+export type KBUpsertRequest = {
+  source: string;
+  chunks: KBChunkIn[];
+  default_language?: string | null;
+  default_tags?: string[];
+};
+
+export type KBUpsertSummary = {
+  created: number;
+  updated: number;
+  skipped: number;
+  processed?: number;
+};
+
+export type KBSearchRequest = {
+  query: string;
+  limit?: number;
+  source?: string;
+  tags?: string[];
+  language?: string | null;
+  include_metadata?: boolean;
+};
+
+export type KBSearchHit = {
+  id: number;
+  source: string;
+  chunk: string;
+  score: number;
+  metadata?: Record<string, unknown> | null;
+};
+
 export const KBAPI = {
-  upsert: (source: string, chunks: KBChunkIn[]) =>
-    request<{ inserted: number }>("/kb/upsert", {
+  upsert: (payload: KBUpsertRequest) =>
+    request<{ summary: KBUpsertSummary }>("/kb/upsert", {
       method: "POST",
-      body: JSON.stringify({ source, chunks })
+      body: JSON.stringify(payload)
     }),
-  search: (query: string, limit = 5) =>
-    request<{ results: { id: number; source: string; chunk: string; score: number }[] }>(
-      "/kb/search",
-      { method: "POST", body: JSON.stringify({ query, limit }) }
-    )
+  search: (payload: KBSearchRequest) =>
+    request<{ results: KBSearchHit[] }>("/kb/search", {
+      method: "POST",
+      body: JSON.stringify({ include_metadata: true, limit: 5, ...payload })
+    })
 };
 
 // ---- Tickets

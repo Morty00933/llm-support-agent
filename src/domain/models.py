@@ -1,4 +1,6 @@
 from __future__ import annotations
+from typing import Any
+
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
 from sqlalchemy import (
     Integer,
@@ -10,6 +12,7 @@ from sqlalchemy import (
     func,
     LargeBinary,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 class Base(DeclarativeBase):
@@ -68,11 +71,56 @@ class KBChunk(Base):
     )
     source: Mapped[str] = mapped_column(String(255), index=True)
     chunk: Mapped[str] = mapped_column(Text())
+    chunk_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     embedding: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
+        "metadata", JSONB, nullable=True
+    )
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
 
 Index("ix_kb_tenant_source", KBChunk.tenant_id, KBChunk.source)
 Index("ix_kb_tenant_created", KBChunk.tenant_id, KBChunk.created_at)
+Index(
+    "uq_kb_chunk_tenant_source_hash",
+    KBChunk.tenant_id,
+    KBChunk.source,
+    KBChunk.chunk_hash,
+    unique=True,
+)
+
+
+class TicketExternalRef(Base):
+    __tablename__ = "ticket_external_refs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(
+        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+    )
+    ticket_id: Mapped[int] = mapped_column(
+        ForeignKey("tickets.id", ondelete="CASCADE"), index=True
+    )
+    system: Mapped[str] = mapped_column(String(32), index=True)
+    reference: Mapped[str] = mapped_column(String(128))
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
+        "metadata", JSONB, nullable=True
+    )
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+Index(
+    "uq_ticket_external_system",
+    TicketExternalRef.ticket_id,
+    TicketExternalRef.system,
+    unique=True,
+)
