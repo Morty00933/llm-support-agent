@@ -522,8 +522,11 @@ export default function KB() {
           </label>
         </div>
         <button
+          type="button"
           disabled={busy}
-          onClick={onSearch}
+          onClick={() => {
+            void onSearch();
+          }}
           className="px-3 py-2 rounded bg-blue-600 text-white disabled:opacity-60"
         >
           Search
