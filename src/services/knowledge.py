@@ -131,31 +131,31 @@ async def upsert_kb(
             payload.update(chunk_in.metadata)
         metadata = _build_metadata(chunk_text, payload)
 
+        insert_stmt = pg_insert(KBChunk).values(
+            tenant_id=tenant_id,
+            source=data.source,
+            chunk=chunk_text,
+            chunk_hash=chunk_hash,
+            embedding=emb.buffer,
+            embedding_vector=emb.vector,
+            metadata=metadata,
+        )
+        excluded = insert_stmt.excluded
         stmt = (
-            pg_insert(KBChunk)
-            .values(
-                tenant_id=tenant_id,
-                source=data.source,
-                chunk=chunk_text,
-                chunk_hash=chunk_hash,
-                embedding=emb.buffer,
-                embedding_vector=emb.vector,
-                metadata=metadata,
-            )
-            .on_conflict_do_update(
+            insert_stmt.on_conflict_do_update(
                 index_elements=[KBChunk.tenant_id, KBChunk.source, KBChunk.chunk_hash],
                 set_={
-                    "chunk": pg_insert.excluded.chunk,
-                    "embedding": pg_insert.excluded.embedding,
-                    "embedding_vector": pg_insert.excluded.embedding_vector,
-                    "metadata": pg_insert.excluded.metadata,
+                    "chunk": excluded.chunk,
+                    "embedding": excluded.embedding,
+                    "embedding_vector": excluded.embedding_vector,
+                    "metadata": excluded["metadata"],
                     "updated_at": func.now(),
                     "archived_at": None,
                 },
                 where=(
-                    (KBChunk.chunk != pg_insert.excluded.chunk)
-                    | (KBChunk.metadata_json != pg_insert.excluded.metadata)
-                    | (KBChunk.embedding != pg_insert.excluded.embedding)
+                    (KBChunk.chunk != excluded.chunk)
+                    | (KBChunk.metadata_json != excluded["metadata"])
+                    | (KBChunk.embedding != excluded.embedding)
                 ),
             )
             .returning(KBChunk.created_at, KBChunk.updated_at)
