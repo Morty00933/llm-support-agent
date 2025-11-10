@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     DB_USER: str = "postgres"
     DB_PASSWORD: str = "postgres"
     DB_NAME: str = "app"
+    DATABASE_URL: str = Field(
+        default="postgresql+asyncpg://postgres:postgres@db:5432/app"
+    )
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
 
@@ -41,9 +44,10 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MIN: int = 60 * 24
 
     # Ollama
-    OLLAMA_HOST: str = "http://ollama:11434"
-    OLLAMA_MODEL_CHAT: str = "llama3.1:8b"
-    OLLAMA_MODEL_EMBED: str = "nomic-embed-text"
+    OLLAMA_BASE_URL: str = Field(default="http://ollama:11434")
+    OLLAMA_MODEL_CHAT: str = Field(default="qwen2.5:3b")
+    OLLAMA_MODEL_EMBED: str = Field(default="nomic-embed-text-v1.5")
+    EMBEDDING_DIM: int = Field(default=768, ge=1)
 
     # Observability
     PROMETHEUS_ENABLED: bool = True
@@ -74,7 +78,7 @@ class Settings(BaseSettings):
 
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
-        return (
+        return self.DATABASE_URL or (
             f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}"
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )

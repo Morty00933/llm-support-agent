@@ -6,8 +6,8 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = "0005_integration_sync_logs"
-down_revision = "0004_kb_vector_and_indexes"
+revision = "0006_integration_sync_logs"
+down_revision = "0005_seed_default_tenant"
 branch_labels = None
 depends_on = None
 

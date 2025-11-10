@@ -20,10 +20,27 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
   if (!res.ok) {
     let detail = "";
+    let payload: any = null;
     try {
-      const j = await res.json();
-      detail = (j as any)?.detail ?? JSON.stringify(j);
+      payload = await res.json();
+      detail = payload?.detail ?? JSON.stringify(payload);
+      if (detail && typeof detail !== "string") {
+        detail = String(detail);
+      }
     } catch {}
+
+    if (res.status === 401) {
+      const { reset } = useAuth.getState();
+      reset();
+      const normalized = detail.toLowerCase();
+      if (normalized.includes("signature has expired")) {
+        throw new Error("Сессия истекла — авторизуйтесь снова.");
+      }
+      throw new Error(
+        detail ? `HTTP 401 Unauthorized: ${detail}` : "Не удалось авторизоваться. Повторите вход."
+      );
+    }
+
     throw new Error(`HTTP ${res.status} ${res.statusText}${detail ? `: ${detail}` : ""}`);
   }
   const ct = res.headers.get("content-type") || "";
