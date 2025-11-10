@@ -7,6 +7,7 @@ from typing import Optional
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+import sqlalchemy as sa
 
 # --- Alembic config (alembic.ini) ---
 config = context.config
@@ -84,6 +85,15 @@ except Exception:
 # --- Конфигурация context.configure -----------------------------------------
 
 
+VERSION_TABLE_KWARGS = {
+    "version_table": "alembic_version",
+    "version_table_create": True,
+    "version_table_column": sa.Column(
+        "version_num", sa.String(length=128), nullable=False
+    ),
+}
+
+
 def run_migrations_offline() -> None:
     """
     Запуск миграций в offline-режиме (генерация SQL без подключения к БД).
@@ -95,6 +105,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,  # если включите autogenerate — будет сравнивать типы
+        **VERSION_TABLE_KWARGS,
     )
 
     with context.begin_transaction():
@@ -117,6 +128,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,  # полезно при autogenerate
+            **VERSION_TABLE_KWARGS,
         )
 
         with context.begin_transaction():
