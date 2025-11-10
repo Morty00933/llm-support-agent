@@ -23,7 +23,7 @@ async def get_tenant_by_slug(session: AsyncSession, slug: str) -> Optional[Tenan
 
 
 async def create_tenant(session: AsyncSession, slug: str) -> Tenant:
-    t = Tenant(slug=slug)
+    t = Tenant(slug=slug, name=slug)
     session.add(t)
     await session.flush()
     return t

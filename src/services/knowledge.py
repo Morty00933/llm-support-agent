@@ -6,6 +6,7 @@ import hashlib
 import math
 import re
 from datetime import datetime, timezone
+import logging
 from typing import Any, Sequence
 
 from sqlalchemy import func, select, delete, update
@@ -22,8 +23,19 @@ from ..schemas.kb import (
     KBDeleteIn,
     KBReindexIn,
 )
-from .embeddings import embed_texts
+from .embeddings import embed_texts, EmbeddingServiceError
 from .search import cosine_similarity_bytes
+
+
+logger = logging.getLogger(__name__)
+
+
+class KnowledgeBaseError(Exception):
+    """Доменные ошибки работы с базой знаний."""
+
+    def __init__(self, message: str, *, status_code: int = 400) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 def _guess_language(text: str) -> str:
@@ -103,7 +115,16 @@ async def upsert_kb(
     if not texts:
         return {"created": 0, "updated": 0, "skipped": skipped}
 
-    embeddings = await embed_texts(texts)
+    try:
+        embeddings = await embed_texts(texts)
+    except EmbeddingServiceError as exc:
+        logger.warning(
+            "Failed to embed KB chunks for tenant %s source %s: %s",
+            tenant_id,
+            data.source,
+            exc,
+        )
+        raise KnowledgeBaseError(str(exc), status_code=exc.status_code)
 
     created = updated = 0
     processed = 0
@@ -131,13 +152,14 @@ async def upsert_kb(
             payload.update(chunk_in.metadata)
         metadata = _build_metadata(chunk_text, payload)
 
+        vector_payload = emb.vector if HAS_PGVECTOR else None
         insert_stmt = pg_insert(KBChunk).values(
             tenant_id=tenant_id,
             source=data.source,
             chunk=chunk_text,
             chunk_hash=chunk_hash,
             embedding=emb.buffer,
-            embedding_vector=emb.vector,
+            embedding_vector=vector_payload,
             metadata=metadata,
         )
         excluded = insert_stmt.excluded
@@ -194,9 +216,18 @@ async def search_kb(
         return []
 
     # Эмбеддинг запроса
-    query_embedding = (await embed_texts([query]))[0]
+    try:
+        query_embedding = (await embed_texts([query]))[0]
+    except EmbeddingServiceError as exc:
+        logger.warning(
+            "Failed to embed KB search query for tenant %s: %s",
+            tenant_id,
+            exc,
+        )
+        raise KnowledgeBaseError(str(exc), status_code=exc.status_code)
 
     include_archived = bool(filters and filters.include_archived)
+    limit = max(1, limit)
 
     if HAS_PGVECTOR:
         distance_clause = KBChunk.embedding_vector.cosine_distance(
@@ -226,8 +257,7 @@ async def search_kb(
         if filters and filters.tags:
             stmt = stmt.where(KBChunk.metadata_json["tags"].contains(filters.tags))
 
-        fetch_limit = max(limit * 4, limit)
-        stmt = stmt.order_by(distance_clause).limit(fetch_limit)
+        stmt = stmt.order_by(distance_clause).limit(limit)
 
         rows = await session.execute(stmt)
 
@@ -346,9 +376,17 @@ async def reindex_kb_chunks(
     batch_size = payload.batch_size
     for i in range(0, len(rows), batch_size):
         batch = rows[i : i + batch_size]
-        embeddings = await embed_texts([row.chunk for row in batch])
+        try:
+            embeddings = await embed_texts([row.chunk for row in batch])
+        except EmbeddingServiceError as exc:
+            logger.warning(
+                "Failed to reindex KB chunks for tenant %s: %s",
+                tenant_id,
+                exc,
+            )
+            raise KnowledgeBaseError(str(exc), status_code=exc.status_code)
         for row_obj, emb in zip(batch, embeddings):
             row_obj.embedding = emb.buffer
-            row_obj.embedding_vector = emb.vector
+            row_obj.embedding_vector = emb.vector if HAS_PGVECTOR else None
             processed += 1
     return {"processed": processed}
