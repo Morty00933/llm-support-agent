@@ -11,9 +11,11 @@ from sqlalchemy import (
     DateTime,
     func,
     LargeBinary,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import UserDefinedType
+from ..core.config import settings
 
 try:  # pragma: no cover - optional dependency
     from pgvector.sqlalchemy import Vector
@@ -71,27 +73,56 @@ class Base(DeclarativeBase):
 class Tenant(Base):
     __tablename__ = "tenants"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    slug: Mapped[str] = mapped_column(String(64), unique=True)
+    name: Mapped[str] = mapped_column(String(255), unique=True)
+    slug: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "email", name="uq_users_tenant_email"),
+        Index("ix_users_tenant_id", "tenant_id"),
+    )
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(
-        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+        ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
     )
-    email: Mapped[str] = mapped_column(String(255), index=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
 
 class Ticket(Base):
     __tablename__ = "tickets"
+    __table_args__ = (
+        Index("ix_tickets_tenant_id", "tenant_id"),
+        Index("ix_tickets_status", "status"),
+    )
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(
-        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+        ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
     )
-    title: Mapped[str] = mapped_column(String(200))
-    status: Mapped[str] = mapped_column(String(32), index=True, default="open")
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
 
 class Message(Base):
@@ -112,54 +143,71 @@ Index("ix_messages_ticket_created", Message.ticket_id, Message.created_at)
 
 class KBChunk(Base):
     __tablename__ = "kb_chunks"
+    _vector_dim = settings.EMBEDDING_DIM if HAS_PGVECTOR else None  # type: ignore[name-defined]
+
+    _table_args = [
+        UniqueConstraint(
+            "tenant_id", "source", "chunk_hash", name="uq_kb_chunk_tenant_source_hash"
+        ),
+        Index("ix_kb_tenant_source", "tenant_id", "source"),
+        Index("ix_kb_tenant_created", "tenant_id", "created_at"),
+        Index("ix_kb_tenant_archived", "tenant_id", "archived_at"),
+    ]
+    if HAS_PGVECTOR:
+        _table_args.append(
+            Index(
+                "ix_kb_chunks_embedding_vector_cosine",
+                "embedding_vector",
+                postgresql_using="ivfflat",
+                postgresql_with={"lists": "100"},
+                postgresql_ops={"embedding_vector": "vector_cosine_ops"},
+            )
+        )
+    __table_args__ = tuple(_table_args)
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(
-        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+        ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
     )
-    source: Mapped[str] = mapped_column(String(255), index=True)
-    chunk: Mapped[str] = mapped_column(Text())
-    chunk_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    embedding: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
-    embedding_vector: Mapped[list[float] | None] = mapped_column(
-        Vector(None), nullable=True
-    )
+    source: Mapped[str] = mapped_column(String(255), nullable=False)
+    chunk: Mapped[str] = mapped_column(Text(), nullable=False)
+    chunk_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
         "metadata", JSONB, nullable=True
     )
+    embedding: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    embedding_vector: Mapped[list[float] | None] = mapped_column(
+        Vector(_vector_dim), nullable=True
+    )
     created_at: Mapped[DateTime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     updated_at: Mapped[DateTime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
     archived_at: Mapped[DateTime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
 
-Index("ix_kb_tenant_source", KBChunk.tenant_id, KBChunk.source)
-Index("ix_kb_tenant_created", KBChunk.tenant_id, KBChunk.created_at)
-Index(
-    "uq_kb_chunk_tenant_source_hash",
-    KBChunk.tenant_id,
-    KBChunk.source,
-    KBChunk.chunk_hash,
-    unique=True,
-)
-
-
 class TicketExternalRef(Base):
     __tablename__ = "ticket_external_refs"
+    __table_args__ = (
+        Index("ix_ticket_external_refs_tenant_id", "tenant_id"),
+        Index("ix_ticket_external_refs_ticket_id", "ticket_id"),
+        Index("ix_ticket_external_refs_system", "system"),
+        UniqueConstraint("ticket_id", "system", name="uq_ticket_external_system"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(
-        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+        ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
     )
     ticket_id: Mapped[int] = mapped_column(
-        ForeignKey("tickets.id", ondelete="CASCADE"), index=True
+        ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False
     )
-    system: Mapped[str] = mapped_column(String(32), index=True)
-    reference: Mapped[str] = mapped_column(String(128))
+    system: Mapped[str] = mapped_column(String(32), nullable=False)
+    reference: Mapped[str] = mapped_column(String(128), nullable=False)
     metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
         "metadata", JSONB, nullable=True
     )
@@ -169,28 +217,26 @@ class TicketExternalRef(Base):
     updated_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
-
-
-Index(
-    "uq_ticket_external_system",
-    TicketExternalRef.ticket_id,
-    TicketExternalRef.system,
-    unique=True,
-)
-
-
 class IntegrationSyncLog(Base):
     __tablename__ = "integration_sync_logs"
+    __table_args__ = (
+        Index(
+            "ix_integration_sync_logs_ticket_system",
+            "ticket_id",
+            "system",
+            "created_at",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     tenant_id: Mapped[int] = mapped_column(
-        ForeignKey("tenants.id", ondelete="CASCADE"), index=True
+        ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
     )
     ticket_id: Mapped[int] = mapped_column(
-        ForeignKey("tickets.id", ondelete="CASCADE"), index=True
+        ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False
     )
-    system: Mapped[str] = mapped_column(String(32), index=True)
-    status: Mapped[str] = mapped_column(String(16), index=True)
+    system: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
     details_json: Mapped[dict[str, Any] | None] = mapped_column(
         "details", JSONB, nullable=True
     )
@@ -199,9 +245,3 @@ class IntegrationSyncLog(Base):
     )
 
 
-Index(
-    "ix_integration_sync_logs_ticket_system",
-    IntegrationSyncLog.ticket_id,
-    IntegrationSyncLog.system,
-    IntegrationSyncLog.created_at,
-)

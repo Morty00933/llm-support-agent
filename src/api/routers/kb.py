@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..deps import get_db, tenant_dep
 from ...schemas.kb import KBUpsert, KBSearchIn, KBArchiveIn, KBDeleteIn, KBReindexIn
 from ...services.knowledge import (
+    KnowledgeBaseError,
     upsert_kb,
     search_kb,
     archive_kb_chunks,
@@ -22,7 +23,10 @@ async def kb_upsert(
 ):
     if not body.chunks:
         raise HTTPException(status_code=400, detail="chunks is empty")
-    stats = await upsert_kb(db, tenant, body)
+    try:
+        stats = await upsert_kb(db, tenant, body)
+    except KnowledgeBaseError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     return {"summary": stats}
 
 
@@ -32,7 +36,10 @@ async def kb_search(
     db: AsyncSession = Depends(get_db),
     tenant: int = Depends(tenant_dep),
 ):
-    results = await search_kb(db, tenant, body.query, body.limit, filters=body)
+    try:
+        results = await search_kb(db, tenant, body.query, body.limit, filters=body)
+    except KnowledgeBaseError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     return {"results": results}
 
 
@@ -68,5 +75,8 @@ async def kb_reindex(
     db: AsyncSession = Depends(get_db),
     tenant: int = Depends(tenant_dep),
 ):
-    result = await reindex_kb_chunks(db, tenant, body)
+    try:
+        result = await reindex_kb_chunks(db, tenant, body)
+    except KnowledgeBaseError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     return {"summary": result}
