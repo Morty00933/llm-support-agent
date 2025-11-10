@@ -36,7 +36,7 @@ x-env: &env
 
 services:
   db:
-    image: ankane/pgvector:pg16
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
