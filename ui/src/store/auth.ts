@@ -10,10 +10,15 @@ type AuthState = {
   reset: () => void;
 };
 
+const envApiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+const defaultApiBase = (envApiBase && envApiBase.length > 0)
+  ? envApiBase.replace(/\/$/, "")
+  : window.location.origin.replace(/\/$/, "");
+
 const saved = {
   token: localStorage.getItem("token"),
   tenant: Number(localStorage.getItem("tenant") || "1"),
-  apiBase: localStorage.getItem("apiBase") || "/api"
+  apiBase: localStorage.getItem("apiBase") || defaultApiBase
 };
 
 export const useAuth = create<AuthState>((set) => ({
@@ -30,11 +35,12 @@ export const useAuth = create<AuthState>((set) => ({
     set({ tenant: id });
   },
   setApiBase: (b) => {
-    localStorage.setItem("apiBase", b);
-    set({ apiBase: b });
+    const normalized = b.replace(/\/$/, "");
+    localStorage.setItem("apiBase", normalized);
+    set({ apiBase: normalized });
   },
   reset: () => {
     localStorage.removeItem("token");
-    set({ token: null });
+    set({ token: null, apiBase: defaultApiBase });
   }
 }));

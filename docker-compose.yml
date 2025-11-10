@@ -13,6 +13,7 @@ x-env: &env
   DB_USER: ${DB_USER:-postgres}
   DB_PASSWORD: ${DB_PASSWORD:-postgres}
   DB_NAME: ${DB_NAME:-app}
+  DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@db:5432/app}
 
   # Redis / Celery
   REDIS_HOST: ${REDIS_HOST:-redis}
@@ -28,13 +29,14 @@ x-env: &env
   JWT_EXPIRE_MIN: ${JWT_EXPIRE_MIN:-1440}
 
   # Ollama
-  OLLAMA_HOST: ${OLLAMA_HOST:-http://ollama:11434}
-  OLLAMA_MODEL_CHAT: ${OLLAMA_MODEL_CHAT:-llama3.1:8b}
-  OLLAMA_MODEL_EMBED: ${OLLAMA_MODEL_EMBED:-nomic-embed-text}
+  OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
+  OLLAMA_MODEL_CHAT: ${OLLAMA_MODEL_CHAT:-qwen2.5:3b}
+  OLLAMA_MODEL_EMBED: ${OLLAMA_MODEL_EMBED:-nomic-embed-text-v1.5}
+  EMBEDDING_DIM: ${EMBEDDING_DIM:-768}
 
 services:
   db:
-    image: ankane/pgvector:pg16
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
@@ -83,8 +85,8 @@ services:
       ollama:
         condition: service_healthy
     environment:
-      OLLAMA_MODEL_CHAT: ${OLLAMA_MODEL_CHAT:-llama3.1:8b}
-      OLLAMA_MODEL_EMBED: ${OLLAMA_MODEL_EMBED:-nomic-embed-text}
+      OLLAMA_MODEL_CHAT: ${OLLAMA_MODEL_CHAT:-qwen2.5:3b}
+      OLLAMA_MODEL_EMBED: ${OLLAMA_MODEL_EMBED:-nomic-embed-text-v1.5}
     entrypoint: ["/bin/sh","-lc"]
     command: |
       set -e
@@ -116,11 +118,15 @@ services:
         condition: service_completed_successfully
     ports:
       - "8000:8000"
-    command: >
-      uvicorn src.api.main:app
-      --host 0.0.0.0
-      --port 8000
-      --workers 2
+    command:
+      - uvicorn
+      - src.api.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --workers
+      - "2"
     # healthcheck без curl — на чистом Python
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request as u; u.urlopen('http://localhost:8000/health'); print('ok')\""]

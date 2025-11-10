@@ -27,7 +27,7 @@ class OllamaChat:
         model: str | None = None,
         timeout: float = 120.0,
     ):
-        self.base_url = (base_url or settings.OLLAMA_HOST).rstrip("/")
+        self.base_url = (base_url or settings.OLLAMA_BASE_URL).rstrip("/")
         self.model = model or settings.OLLAMA_MODEL_CHAT
         self.timeout = timeout
 

@@ -4,3 +4,4 @@ fmt: ; ruff check --fix . && black .
 test: ; pytest -q
 migrate: ; alembic upgrade head
 revision: ; alembic revision -m "$m"
+smoke: ; python scripts/smoke.py
