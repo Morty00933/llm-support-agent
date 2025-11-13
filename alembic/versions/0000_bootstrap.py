@@ -10,7 +10,7 @@ from sqlalchemy.engine import reflection
 
 # revision identifiers, used by Alembic.
 revision: str = "0000_bootstrap"
-down_revision: str | None = None
+down_revision: str | None = "0000_alter_alembic_version_len"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 
