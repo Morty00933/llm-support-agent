@@ -160,7 +160,7 @@ async def upsert_kb(
             chunk_hash=chunk_hash,
             embedding=emb.buffer,
             embedding_vector=vector_payload,
-            metadata=metadata,
+            metadata_json=metadata,
         )
         excluded = insert_stmt.excluded
         stmt = (
