@@ -29,6 +29,7 @@ x-env: &env
   JWT_EXPIRE_MIN: ${JWT_EXPIRE_MIN:-1440}
 
   # Ollama
+  # ВАЖНО: внутри docker-сети ollama доступен по http://ollama:11434
   OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
   OLLAMA_MODEL_CHAT: ${OLLAMA_MODEL_CHAT:-qwen2.5:3b}
   OLLAMA_MODEL_EMBED: ${OLLAMA_MODEL_EMBED:-nomic-embed-text-v1.5}
@@ -63,11 +64,11 @@ services:
       retries: 30
     restart: unless-stopped
 
-  # Сервер локальных моделей
+  # Сервер локальных моделей (ТЕПЕРЬ БЕЗ ПОРТОВ НА ХОСТ)
   ollama:
     image: ollama/ollama:latest
-    ports:
-      - "${OLLAMA_HOST_PORT:-11434}:11434"
+    # ports:  # не публикуем на Windows, чтобы не конфликтовать с ollama.exe
+    #   - "${OLLAMA_HOST_PORT:-11434}:11434"
     volumes:
       - ollama:/root/.ollama
     healthcheck:
@@ -117,7 +118,7 @@ services:
       ollama-pull:
         condition: service_completed_successfully
     ports:
-      - "8000:8000"
+      - "${API_HOST_PORT:-8000}:8000"
     command:
       - uvicorn
       - src.api.main:app
@@ -171,7 +172,7 @@ services:
       api:
         condition: service_healthy
     ports:
-      - "8080:80"
+      - "${UI_HOST_PORT:-8080}:80"
     restart: unless-stopped
 
 volumes:
