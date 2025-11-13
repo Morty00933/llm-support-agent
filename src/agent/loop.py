@@ -57,13 +57,15 @@ class Agent:
                 await session.execute(
                     select(Message)
                     .where(Message.ticket_id == ticket_id)
-                    .order_by(Message.id.asc())
+                    .order_by(Message.id.desc())
                     .limit(limit)
                 )
             )
             .scalars()
             .all()
         )
+        # Мы отдаем сообщения в хронологическом порядке, поэтому переворачиваем
+        rows.reverse()
         return list(rows)
 
     @staticmethod
@@ -114,18 +116,26 @@ class Agent:
         *,
         tenant_id: int,
         ticket_id: int,
+        prompt: str | None = None,
         kb_limit: int = 5,
         temperature: float = 0.2,
     ) -> AgentResult:
         """
         Генерирует ответ по тикету:
-        - загружает тикет и историю сообщений;
+        - загружает тикет и историю сообщений (опционально дополняя их ad-hoc вопросом пользователя);
         - делает семантический поиск по KB (по заголовку + последнему пользовательскому сообщению);
         - собирает промпт и спрашивает LLM (Ollama);
         - не пишет ответ в БД — оставлено на API-уровень.
         """
         ticket = await self._load_ticket(session, tenant_id, ticket_id)
         history = await self._load_messages(session, ticket_id)
+
+        prompt = normalize_whitespace(prompt or "") or None
+        if prompt:
+            history = [
+                *history,
+                Message(ticket_id=ticket_id, role="user", content=prompt),
+            ]
 
         # Собираем поисковый запрос из заголовка + последнего user-сообщения, если есть
         last_user = next(

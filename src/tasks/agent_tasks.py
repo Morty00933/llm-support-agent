@@ -60,7 +60,7 @@ def sync_ticket_task(
     return result
 
 
-@celery_app.task(name="agent.process_ticket")
+@celery_app.task(bind=True, name="agent.process_ticket")
 def process_ticket(self, ticket_id: int, tenant_id: int) -> dict[str, Any]:
     """Backward compatible wrapper that triggers integration sync."""
 
