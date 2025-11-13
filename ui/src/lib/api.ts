@@ -14,7 +14,10 @@ export function apiHeaders(extra?: HeadersInit) {
 // Единый запрос
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const { apiBase } = useAuth.getState();
-  const res = await fetch(`${apiBase}/v1${path}`, {
+  const normalizedBase = apiBase.replace(/\/$/, "");
+  const hasVersionSuffix = /\/v\d+$/.test(normalizedBase);
+  const prefix = hasVersionSuffix ? "" : "/v1";
+  const res = await fetch(`${normalizedBase}${prefix}${path}`, {
     ...init,
     headers: apiHeaders(init.headers)
   });
