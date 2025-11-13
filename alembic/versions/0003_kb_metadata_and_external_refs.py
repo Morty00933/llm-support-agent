@@ -24,13 +24,20 @@ def _has_index(inspector: reflection.Inspector, table: str, name: str) -> bool:
     return any(idx["name"] == name for idx in inspector.get_indexes(table))
 
 
-def _has_unique_constraint(
+def _has_unique_constraint_or_index(
     inspector: reflection.Inspector, table: str, name: str
 ) -> bool:
-    return any(
-        constraint["name"] == name
-        for constraint in inspector.get_unique_constraints(table)
-    )
+    """Return True when a unique constraint or index with the given name exists."""
+
+    for constraint in inspector.get_unique_constraints(table):
+        if constraint["name"] == name:
+            return True
+
+    for index in inspector.get_indexes(table):
+        if index["name"] == name and index.get("unique"):
+            return True
+
+    return False
 
 
 def upgrade() -> None:
@@ -56,7 +63,7 @@ def upgrade() -> None:
             ),
         )
 
-    if not _has_unique_constraint(
+    if not _has_unique_constraint_or_index(
         inspector, "kb_chunks", "uq_kb_chunk_tenant_source_hash"
     ):
         op.create_unique_constraint(
