@@ -25,7 +25,7 @@ from src.core.config import settings
 
 # revision identifiers, used by Alembic.
 revision: str = "0002_kb_chunks"
-down_revision: str | None = "0000_bootstrap"
+down_revision: str | None = "0001_rebootstrap_schema"
 branch_labels: Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 
