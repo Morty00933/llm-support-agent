@@ -1,6 +1,6 @@
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..deps import get_db, tenant_dep
 from ...domain.models import Ticket, Message
@@ -53,9 +53,16 @@ class TicketAnswerOut(BaseModel):
     saved_message_id: int | None = None
 
 
+class TicketAnswerIn(BaseModel):
+    query: str | None = None
+    kb_limit: int | None = Field(default=None, ge=1, le=20)
+    temperature: float | None = Field(default=None, ge=0, le=2.0)
+
+
 @router.post("/tickets/{ticket_id}/answer", response_model=TicketAnswerOut)
 async def answer_for_ticket(
     ticket_id: int,
+    body: TicketAnswerIn | None = None,
     db: AsyncSession = Depends(get_db),
     tenant: int = Depends(tenant_dep),
     save: bool = Query(
@@ -70,12 +77,20 @@ async def answer_for_ticket(
         raise HTTPException(status_code=404, detail="ticket not found")
 
     agent = Agent()
+    payload = body or TicketAnswerIn()
+    prompt = payload.query.strip() if payload.query else None
+    kb_limit_value = payload.kb_limit if payload.kb_limit is not None else kb_limit
+    temperature_value = (
+        payload.temperature if payload.temperature is not None else temperature
+    )
+
     res: AgentResult = await agent.answer_for_ticket(
         db,
         tenant_id=tenant,
         ticket_id=ticket_id,
-        kb_limit=kb_limit,
-        temperature=temperature,
+        prompt=prompt,
+        kb_limit=kb_limit_value,
+        temperature=temperature_value,
     )
 
     saved_id: int | None = None
