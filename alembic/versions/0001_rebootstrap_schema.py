@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-import importlib
+import importlib.util
+import sys
+from pathlib import Path
+from types import ModuleType
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.engine import reflection
@@ -32,8 +36,25 @@ def _schema_is_legacy(inspector: reflection.Inspector) -> bool:
     return False
 
 
+def _load_bootstrap() -> ModuleType:
+    module_name = "alembic.versions.0000_bootstrap"
+    module = sys.modules.get(module_name)
+    if module is not None:
+        return module
+
+    path = Path(__file__).resolve().parent / "0000_bootstrap.py"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:  # pragma: no cover - defensive guard
+        raise RuntimeError("Unable to load bootstrap migration script")
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def _run_bootstrap() -> None:
-    bootstrap = importlib.import_module("alembic.versions.0000_bootstrap")
+    bootstrap = _load_bootstrap()
     bootstrap.upgrade()
 
 
