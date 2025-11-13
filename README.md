@@ -14,7 +14,7 @@ The backend ships with a fully managed schema: Alembic migrations bootstrap the 
 | api     | FastAPI (uvicorn)       | 8000 → 8000 |
 | db      | PostgreSQL + pgvector   | 5432 → 5432 |
 | redis   | Redis for Celery        | 6379 → 6379 |
-| ollama  | Ollama models           | 11434 → 11434 |
+| ollama  | Ollama models           | ${OLLAMA_HOST_PORT:-11434} → 11434 |
 | worker  | Celery worker           | internal |
 
 The UI proxies API calls to `http://api:8000/v1/*` and `/health`.
@@ -41,6 +41,8 @@ Running containers or local processes now uses a shared entrypoint (`ops/entrypo
 - `OLLAMA_MODEL_CHAT=qwen2.5:3b`
 - `OLLAMA_MODEL_EMBED=nomic-embed-text-v1.5`
 - `EMBEDDING_DIM=768`
+
+The Ollama container binds to `${OLLAMA_HOST_PORT:-11434}` so you can export `OLLAMA_HOST_PORT=11435` (or any free port) when `11434` is already used on the host machine.
 
 Startup checks in `src/api/main.py` enforce `EMBEDDING_DIM > 0`, require non-empty model/base URL values, and perform a best-effort Ollama reachability probe (warning if unavailable). A dependency health endpoint (`GET /health/deps`) reports database and Ollama status, returning HTTP 503 on failures.
 
