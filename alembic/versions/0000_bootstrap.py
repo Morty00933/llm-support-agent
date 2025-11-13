@@ -1,5 +1,3 @@
-"""Bootstrap database schema and required extensions."""
-
 """Initial bootstrap migration with required extensions and core tables."""
 
 from __future__ import annotations
