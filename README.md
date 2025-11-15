@@ -1,154 +1,413 @@
-# LLM Support Agent
+# LLM Support Agent — README
 
-## Overview
+## Обзор
 
-LLM Support Agent is a local-first helpdesk stack that bundles a React single-page app, a FastAPI backend, Postgres with pgvector, Ollama for chat + embeddings, and Celery workers. All services are wired for multi-tenant scenarios via JWT (`/v1/auth/login`) and the `X-Tenant-Id` header.
+**LLM Support Agent** — это полностью локализуемая система поддержки, объединяющая тикетинг, базу знаний, локальные модели LLM (через Ollama), асинхронные интеграции (Jira/Zendesk), мультитенантность и удобный веб-интерфейс.
+Система создана для компаний, которые хотят:
 
-The backend ships with a fully managed schema: Alembic migrations bootstrap the database, enable `pgcrypto`/`vector`, create all tenant/ticket/knowledge-base tables, and seed a default tenant (`id=1`, name `default`) with the demo user `user@example.com` / `secret`.
+* использовать собственные данные без передачи их третьим сторонам;
+* расширить службу поддержки интеллектуальными автозапросами;
+* централизовать тикеты, диалоги и knowledge-base контент;
+* интегрироваться с существующими helpdesk-платформами.
 
-## Service topology
+Проект разворачивается через Docker, полностью автономен и может работать даже без доступа в Интернет.
 
-| Service | Purpose | Host mapping |
-|---------|---------|--------------|
-| ui      | Nginx + SPA + proxy     | 8080 → 80  |
-| api     | FastAPI (uvicorn)       | 8000 → 8000 |
-| db      | PostgreSQL + pgvector   | 5432 → 5432 |
-| redis   | Redis for Celery        | 6379 → 6379 |
-| ollama  | Ollama models           | ${OLLAMA_HOST_PORT:-11434} → 11434 |
-| worker  | Celery worker           | internal |
+---
 
-The UI proxies API calls to `http://api:8000/v1/*` and `/health`.
+# Содержание
 
-## Database migrations
+1. [Архитектура](#архитектура)
+2. [Технологии](#технологии)
+3. [Быстрый старт](#быстрый-старт)
+4. [Структура репозитория](#структура-репозитория)
+5. [Бэкенд](#бэкенд)
+6. [Фронтенд](#фронтенд)
+7. [База знаний](#база-знаний)
+8. [Работа агента](#работа-агента)
+9. [Интеграции Jira/Zendesk](#интеграции-jira-zendesk)
+10. [Мультитенантность](#мультитенантность)
+11. [Миграции БД и тестирование](#миграции-бд-и-тестирование)
+12. [Охрана, логирование и метрики](#охрана-логирование-и-метрики)
+13. [Настройка окружения](#настройка-окружения)
+14. [Планы развития](#планы-развития)
 
-Alembic revisions ship in `alembic/versions/`:
+---
 
-1. `0000_bootstrap.py` — installs `pgcrypto`, `vector`, creates `alembic_version` (VARCHAR(128)), and builds tenants, users, tickets, messages with proper defaults.
-2. `0002_kb_chunks.py` — provisions the complete `kb_chunks` schema (`embedding_vector VECTOR(:EMBEDDING_DIM)`, JSONB metadata, hash uniqueness, IVFFLAT index) plus supporting indexes.
-3. `0003_kb_metadata_and_external_refs.py` — idempotent column/table guards and SHA-256 backfill for existing chunks.
-4. `0004_kb_vector_and_indexes.py` — ensures vector/archived columns and indexes exist when upgrading older installs.
-5. `0005_seed_default_tenant.py` — inserts the demo tenant + user with a bcrypt hash for `secret`.
-6. `0006_integration_sync_logs.py` — audit logs for external sync jobs.
+# Архитектура
 
-Running containers or local processes now uses a shared entrypoint (`ops/entrypoint.sh`) that executes `alembic upgrade head` before launching uvicorn or Celery, keeping schemas current without manual intervention.
+## Компоненты
 
-## Configuration defaults
+| Компонент                 | Описание                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------------ |
+| **UI (React + Nginx)**    | Веб-панель для работы с тикетами, базой знаний, агентом и настройками.                           |
+| **API (FastAPI)**         | REST-сервер, маршруты `/v1/kb`, `/v1/tickets`, `/v1/support`, `/v1/auth`, `/metrics`, `/health`. |
+| **LLM (Ollama)**          | Модели для генерации ответов и для эмбеддингов. Запускается локально.                            |
+| **PostgreSQL + pgvector** | Хранилище тикетов, сообщений, KB-чанков, внешних ссылок, синхронизаций.                          |
+| **Redis**                 | Брокер задач Celery.                                                                             |
+| **Celery worker**         | Асинхронные процессоры для Jira/Zendesk синхронизаций и фоновых операций.                        |
 
-`src/core/config.py` exposes sane defaults via Pydantic settings:
+В результате получается распределённая система, где LLM-ответы формируются синхронно, а интеграции с внешними системами — асинхронно и без блокировки UI.
 
-- `DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/app`
-- `OLLAMA_BASE_URL=http://ollama:11434`
-- `OLLAMA_MODEL_CHAT=qwen2.5:3b`
-- `OLLAMA_MODEL_EMBED=nomic-embed-text-v1.5`
-- `EMBEDDING_DIM=768`
+---
 
-The Ollama container binds to `${OLLAMA_HOST_PORT:-11434}` so you can export `OLLAMA_HOST_PORT=11435` (or any free port) when `11434` is already used on the host machine.
+# Технологии
 
-Startup checks in `src/api/main.py` enforce `EMBEDDING_DIM > 0`, require non-empty model/base URL values, and perform a best-effort Ollama reachability probe (warning if unavailable). A dependency health endpoint (`GET /health/deps`) reports database and Ollama status, returning HTTP 503 on failures.
+* **Backend:** FastAPI, SQLAlchemy 2.0, Alembic, Celery, Redis, httpx, structlog
+* **ML:** Ollama, pgvector
+* **Frontend:** React 18, TypeScript, Vite, TailwindCSS, Zustand, React Query
+* **Инфра:** Docker, docker-compose, Nginx
+* **Наблюдаемость:** Prometheus metrics, Sentry/OTEL (опционально)
 
-The shared embedding client (`src/services/embeddings.py`) now retries transient failures, validates vector length, and raises user-facing `EmbeddingServiceError`s so `/v1/kb/*` endpoints return informative 4xx responses instead of 500s.
+---
 
-## Quick start
+# Быстрый старт
 
-```bash
-# build and start all services
-docker compose up -d
+## Предусловия
 
-# verify health via the API proxy
-curl -s http://127.0.0.1:8080/health
-curl -s http://127.0.0.1:8080/health/deps | jq
+* Docker + Docker Compose
+* 8GB RAM минимум (лучше 16GB, если используете грандиозные модели)
+* Некоторый объём на диске (модели Ollama весят 1–5GB)
 
-# optional smoke test (requires python)
-make smoke
+## Установка
+
+1. Скопируйте `.env.example` в `.env`:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Запустите:
+
+   ```bash
+   make run
+   ```
+
+3. Откройте UI:
+
+   ```
+   http://localhost:8080
+   ```
+
+4. Войдите:
+
+   * tenant: **1**
+   * email: **[user@example.com](mailto:user@example.com)**
+   * пароль: **любой** (в DEMO режиме используется упрощённая авторизация)
+
+5. Проверьте работоспособность:
+
+   ```bash
+   make smoke
+   ```
+
+---
+
+# Структура репозитория
+
+```
+llm/
+├── src/               # Backend
+│   ├── api/           # FastAPI endpoints
+│   ├── agent/         # LLM agent logic
+│   ├── services/      # KB, embeddings, integrations
+│   ├── domain/        # ORM models, repositories
+│   ├── core/          # Config, DB, logging, Celery, metrics
+│   └── tasks/         # Celery tasks
+│
+├── ui/                # Frontend (React)
+├── migrations/        # Alembic migrations
+├── ops/               # Entrypoints
+├── scripts/           # smoke-тест
+└── docker-compose.yml
 ```
 
-The SPA lives at <http://localhost:8080>. Authenticated routes expect the seeded user (`user@example.com` / `secret`, tenant `1`).
+---
 
-### Smoke test
+# Бэкенд
 
-`make smoke` executes `scripts/smoke.py`, which performs the following against `http://localhost:8080`:
+## Основной стек
 
-1. `GET /health`
-2. `POST /v1/auth/login`
-3. `POST /v1/kb/upsert` with two sample chunks
-4. `POST /v1/kb/search`
+* FastAPI раздаёт эндпоинты под `/v1/**`.
+* SQLAlchemy (async) управляет транзакциями через `get_session()`.
+* Все операции изолированы по tenant’у.
+* Celery выполняет интеграции в фоне.
+* Метрики доступны по `/metrics`.
 
-Failures or non-200 responses abort the script with a non-zero exit code.
+## Основные маршруты
 
-## UI proxy & environment
+### `/v1/auth/login`
 
-The SPA is served via `ui/nginx.conf`, forwarding:
+Возвращает JWT. В прод-режиме рекомендуется включить полноценную проверку паролей.
 
-```nginx
-location /v1/ { proxy_pass http://api:8000/v1/; }
-location /health { proxy_pass http://api:8000/health; }
+### `/v1/tickets/**`
+
+Управление тикетами:
+
+* создание тикета,
+* просмотр истории,
+* добавление сообщений,
+* получение ответа агента.
+
+### `/v1/kb/**`
+
+Работа с базой знаний:
+
+* загрузка чанков,
+* поиск,
+* архивирование/удаление,
+* переиндексация эмбеддингов.
+
+### `/v1/support/**`
+
+Запросы к LLM:
+
+* простой запрос агента («чат»),
+* запрос по тикету с использованием контекста KB,
+* автоматическое решение об эскалации.
+
+---
+
+# Фронтенд
+
+Работает через Nginx, проксируя API на `api:8000`.
+Функциональные экраны:
+
+* **Tickets** — создание тикетов, просмотр сообщений, запуск агента.
+* **Knowledge Base** — загрузка и поиск по KB.
+* **Agent Playground** — свободный чат с LLM.
+* **Settings** — tenant, URL API, токен.
+
+React Query кеширует данные и повторяет запросы при нестабильной сети.
+
+---
+
+# База знаний
+
+KB — это набор чанков, каждый содержит:
+
+* текст (фрагмент статьи, документа, инструкции),
+* хэш chunk_hash (SHA-256),
+* эмбеддинг,
+* вектор (если pgvector включён),
+* метаданные (tags, language, external_id),
+* tenant_id.
+
+### Вставка / Upsert
+
+Эндпоинт `/v1/kb/upsert`:
+
+* принимает список чанков;
+* каждому тексту считает embedding;
+* сохраняет в БД через `INSERT … ON CONFLICT (tenant, source, hash)`.
+
+### Поиск
+
+`/v1/kb/search`:
+
+1. LLM формирует embedding поискового запроса.
+2. Если pgvector включён — поиск через `embedding_vector <-> query_vector`.
+3. Если pgvector отключён — cosine-similarity в приложении.
+4. Возвращает топ-N релевантных фрагментов.
+
+---
+
+# Работа агента
+
+Алгоритм `answer_for_ticket`:
+
+1. Загрузить тикет и историю сообщений.
+2. Преобразовать историю в компактный текст.
+3. Сформировать поисковый запрос: *заголовок тикета + последнее сообщение*.
+4. Найти топ релевантных KB-чанков.
+5. Сформировать системный промпт:
+
+   * политику LLM,
+   * контекст KB,
+   * историю диалога,
+   * ограничения (не выдумывать, быть кратким).
+6. Отправить в Ollama `/api/chat`.
+7. Проанализировать ответ.
+8. Принять решение об эскалации:
+
+   * эвристики по ключевым словам,
+   * факторы отсутствия контекста.
+9. Вернуть JSON-результат: текст ответа, KB-хиты, эскалация (да/нет).
+
+Также есть метод свободного общения `/v1/support/agent/answer`.
+
+---
+
+# Интеграции Jira/Zendesk
+
+Асинхронные цепочки выполняются через Celery:
+
+1. Агент решает эскалировать тикет.
+2. API ставит задачу `sync_ticket_task`.
+3. Celery worker выполняет:
+
+   * сбор сообщения/контекста,
+   * создание Jira issue или Zendesk ticket,
+   * запись внешнего ID (`TicketExternalRef`),
+   * сохранение логов (`IntegrationSyncLog`).
+
+Доступные переменные:
+
+* `JIRA_ENABLED`, `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN`
+* `ZENDESK_ENABLED`, `ZENDESK_SUBDOMAIN`, `ZENDESK_EMAIL`, `ZENDESK_API_TOKEN`
+
+---
+
+# Мультитенантность
+
+Каждый запрос указывает tenant:
+
+* либо через JWT `tenant: <id>`,
+* либо заголовок `X-Tenant-Id`.
+
+Все таблицы содержат `tenant_id`, и все выборки проходят через фильтры.
+
+Это позволяет использовать один экземпляр приложения для нескольких организаций.
+
+---
+
+# Миграции БД и тестирование
+
+## Миграции
+
+* Alembic хранится в каталоге `migrations/`.
+* При запуске контейнера `api` автоматически выполняется:
+
+  ```
+  alembic upgrade head
+  ```
+
+## Тесты
+
+* Unit-тесты (`tests/`) для health и auth.
+* Smoke-тест (`scripts/smoke.py`) прогоняет:
+
+  * здоровье системы,
+  * логин,
+  * загрузку KB,
+  * поиск KB.
+
+Для CI рекомендуется:
+
+* mypy
+* ruff / black
+* pytest
+* smoke
+* docker build
+
+---
+
+# Охрана, логирование и метрики
+
+## Логирование
+
+Используется `structlog`:
+
+* JSON-формат;
+* Timestamps;
+* Ошибки с stacktrace.
+
+## Метрики
+
+Доступны по маршруту `/metrics`:
+
+* `http_requests_total{method,path,status}`
+* `http_latency_seconds_bucket{method,path}`
+* `celery_tasks_total{name,status}`
+* `integration_sync_total{system,status}`
+
+Можно собрать дашборд в Grafana.
+
+## Health
+
+* `/health` — общий статус API.
+* `/health/deps` — проверка связи с PostgreSQL и Ollama.
+
+---
+
+# Настройка окружения
+
+## Основные переменные `.env`
+
+### LLM
+
+```
+OLLAMA_BASE_URL=http://ollama:11434
+OLLAMA_MODEL_CHAT=qwen2.5:3b
+OLLAMA_MODEL_EMBED=nomic-embed-text-v1.5
+EMBEDDING_DIM=768
 ```
 
-Configure the frontend API base through `ui/.env` (template provided as `ui/.env.example`):
+### База данных
 
 ```
-VITE_API_BASE_URL=http://localhost:8080
+DB_HOST=db
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=llm
 ```
 
-The Zustand store (`ui/src/store/auth.ts`) defaults to that base and normalises trailing slashes. Logging out resets the API base to the environment default.
+### Redis/Celery
 
-## API reference cheat-sheet
-
-All endpoints are under `http://localhost:8080/v1/*` unless stated otherwise.
-
-| Purpose | Method | Path |
-|---------|--------|------|
-| Health (proxy) | GET | `/health` |
-| Dependency health | GET | `/health/deps` |
-| Metrics | GET | `/metrics` |
-| Login | POST | `/v1/auth/login` |
-| KB upsert | POST | `/v1/kb/upsert` |
-| KB search | POST | `/v1/kb/search` |
-| KB archive | POST | `/v1/kb/archive` |
-| KB delete | POST | `/v1/kb/delete` |
-| KB reindex | POST | `/v1/kb/reindex` |
-
-### Bash / curl examples
-
-```bash
-BASE="http://127.0.0.1:8080"
-TENANT=1
-TOKEN=$(curl -s "$BASE/v1/auth/login" \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"user@example.com","password":"secret","tenant":1}' | jq -r .access_token)
-
-curl -s "$BASE/v1/kb/upsert" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "X-Tenant-Id: $TENANT" \
-  -H 'Content-Type: application/json' \
-  -d '{"source":"docs","chunks":[{"content":"Reset your password via email."},{"content":"Contact support for MFA issues."}]}'
-
-curl -s "$BASE/v1/kb/search" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "X-Tenant-Id: $TENANT" \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"password reset"}' | jq
+```
+REDIS_HOST=redis
+CELERY_BROKER_URL=redis://redis:6379/0
 ```
 
-### PowerShell 7 examples
+### JWT
 
-```powershell
-$Base = "http://127.0.0.1:8080"
-$Tenant = 1
-
-$login = Invoke-RestMethod -Uri "$Base/v1/auth/login" -Method Post -ContentType 'application/json' -Body '{"email":"user@example.com","password":"secret","tenant":1}'
-$headers = @{ 'Authorization' = "Bearer $($login.access_token)"; 'X-Tenant-Id' = $Tenant; 'Content-Type' = 'application/json' }
-
-Invoke-RestMethod -Uri "$Base/v1/kb/upsert" -Method Post -Headers $headers -Body '{"source":"docs","chunks":[{"content":"Reset your password via email."}]}'
-Invoke-RestMethod -Uri "$Base/v1/kb/search" -Method Post -Headers $headers -Body '{"query":"password"}'
+```
+JWT_SECRET=super-secret
+JWT_AUD=llm
+JWT_ISS=llm-agent
+JWT_EXPIRE_MIN=43200
 ```
 
-## Troubleshooting tips
+### CORS / Hosts
 
-- `Signature has expired` responses trigger a frontend reset; log in again to refresh credentials.
-- `Embedding size mismatch` or `Ollama embeddings request failed` indicates either a misconfigured `EMBEDDING_DIM` or missing Ollama model; update `.env` or ensure the Ollama container has pulled `nomic-embed-text-v1.5`.
-- `GET /health/deps` returning 503 lists `database_error` / `ollama_error` payloads to help diagnose connectivity.
+```
+CORS_ORIGINS=http://localhost:8080
+TRUSTED_HOSTS=localhost
+```
 
-## Tests
+### Jira / Zendesk (опционально)
 
-Run unit tests with `pytest`. The smoke test (`make smoke`) ensures a freshly started stack answers auth + KB flows end-to-end.
+```
+JIRA_ENABLED=false
+JIRA_BASE_URL=
+JIRA_EMAIL=
+JIRA_API_TOKEN=
+```
+
+---
+
+# Планы развития
+
+* полноценная аутентификация (bcrypt + проверки в login эндпоинте);
+* конфигурируемый scoring-алгоритм KB;
+* улучшенная логика эскалации;
+* UI-панель для мониторинга интеграций и состояния Celery;
+* пакетное импортирование KB из Confluence/Notion;
+* ролевая модель пользователей;
+* мультимодельный режим (несколько моделей LLM);
+* webhooks для внешних систем.
+
+---
+
+# Лицензия
+
+Проект может быть адаптирован под нужды организации.
+Перед коммерческим использованием рекомендуется провести аудит безопасности.
+
+---
+
+# Контакты
+
+Для вопросов по структуре, доработке или развёртыванию можно обращаться к разработчику проекта или команде, которая обслуживает этот репозиторий.
+
+---
