@@ -11,6 +11,7 @@ from sqlalchemy.dialects import postgresql
 try:  # pragma: no cover - optional dependency for typing accuracy
     from pgvector.sqlalchemy import Vector
 except ModuleNotFoundError:  # pragma: no cover
+
     class Vector(sa.types.UserDefinedType):
         cache_ok = True
 
@@ -20,6 +21,7 @@ except ModuleNotFoundError:  # pragma: no cover
 
         def get_col_spec(self, **kw):
             return f"vector({self.dim})" if self.dim else "vector"
+
 
 from src.core.config import settings
 

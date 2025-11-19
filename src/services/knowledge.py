@@ -163,25 +163,22 @@ async def upsert_kb(
             metadata_json=metadata,
         )
         excluded = insert_stmt.excluded
-        stmt = (
-            insert_stmt.on_conflict_do_update(
-                index_elements=[KBChunk.tenant_id, KBChunk.source, KBChunk.chunk_hash],
-                set_={
-                    "chunk": excluded.chunk,
-                    "embedding": excluded.embedding,
-                    "embedding_vector": excluded.embedding_vector,
-                    "metadata": excluded["metadata"],
-                    "updated_at": func.now(),
-                    "archived_at": None,
-                },
-                where=(
-                    (KBChunk.chunk != excluded.chunk)
-                    | (KBChunk.metadata_json != excluded["metadata"])
-                    | (KBChunk.embedding != excluded.embedding)
-                ),
-            )
-            .returning(KBChunk.created_at, KBChunk.updated_at)
-        )
+        stmt = insert_stmt.on_conflict_do_update(
+            index_elements=[KBChunk.tenant_id, KBChunk.source, KBChunk.chunk_hash],
+            set_={
+                "chunk": excluded.chunk,
+                "embedding": excluded.embedding,
+                "embedding_vector": excluded.embedding_vector,
+                "metadata": excluded["metadata"],
+                "updated_at": func.now(),
+                "archived_at": None,
+            },
+            where=(
+                (KBChunk.chunk != excluded.chunk)
+                | (KBChunk.metadata_json != excluded["metadata"])
+                | (KBChunk.embedding != excluded.embedding)
+            ),
+        ).returning(KBChunk.created_at, KBChunk.updated_at)
 
         result = await session.execute(stmt)
         row = result.fetchone()

@@ -20,7 +20,11 @@ def upgrade() -> None:
         sa.Column("ticket_id", sa.Integer(), nullable=False),
         sa.Column("system", sa.String(length=32), nullable=False),
         sa.Column("status", sa.String(length=16), nullable=False),
-        sa.Column("details", sa.dialects.postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+        sa.Column(
+            "details",
+            sa.dialects.postgresql.JSONB(astext_type=sa.Text()),
+            nullable=True,
+        ),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -38,5 +42,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_integration_sync_logs_ticket_system", table_name="integration_sync_logs")
+    op.drop_index(
+        "ix_integration_sync_logs_ticket_system", table_name="integration_sync_logs"
+    )
     op.drop_table("integration_sync_logs")

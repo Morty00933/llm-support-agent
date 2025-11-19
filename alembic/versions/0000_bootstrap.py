@@ -148,9 +148,7 @@ def upgrade() -> None:
                 nullable=False,
             ),
         )
-    if not _has_index(
-        inspector, "messages", "ix_messages_ticket_created"
-    ):
+    if not _has_index(inspector, "messages", "ix_messages_ticket_created"):
         op.create_index(
             "ix_messages_ticket_created", "messages", ["ticket_id", "created_at"]
         )

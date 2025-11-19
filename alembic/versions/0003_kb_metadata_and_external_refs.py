@@ -46,11 +46,15 @@ def upgrade() -> None:
 
     cols = _column_names(inspector, "kb_chunks")
     if "chunk_hash" not in cols:
-        op.add_column("kb_chunks", sa.Column("chunk_hash", sa.String(length=64), nullable=True))
+        op.add_column(
+            "kb_chunks", sa.Column("chunk_hash", sa.String(length=64), nullable=True)
+        )
     if "metadata" not in cols:
         op.add_column(
             "kb_chunks",
-            sa.Column("metadata", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
+            sa.Column(
+                "metadata", postgresql.JSONB(astext_type=sa.Text()), nullable=True
+            ),
         )
     if "updated_at" not in cols:
         op.add_column(

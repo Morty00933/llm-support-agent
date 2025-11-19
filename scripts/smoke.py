@@ -16,21 +16,31 @@ EMAIL = os.environ.get("SMOKE_EMAIL", "user@example.com")
 PASSWORD = os.environ.get("SMOKE_PASSWORD", "secret")
 
 
-def _request(method: str, path: str, *, headers: dict[str, str] | None = None, body: Any | None = None) -> dict[str, Any]:
+def _request(
+    method: str,
+    path: str,
+    *,
+    headers: dict[str, str] | None = None,
+    body: Any | None = None,
+) -> dict[str, Any]:
     url = f"{BASE_URL}{path}"
     payload: bytes | None = None
     req_headers = {"Accept": "application/json", **(headers or {})}
     if body is not None:
         payload = json.dumps(body).encode("utf-8")
         req_headers.setdefault("Content-Type", "application/json")
-    request = urllib.request.Request(url, data=payload, headers=req_headers, method=method)
+    request = urllib.request.Request(
+        url, data=payload, headers=req_headers, method=method
+    )
     try:
         with urllib.request.urlopen(request, timeout=15) as response:
             text = response.read().decode("utf-8")
             content_type = response.headers.get("Content-Type", "")
             return {
                 "status": response.status,
-                "body": json.loads(text) if "application/json" in content_type else text,
+                "body": (
+                    json.loads(text) if "application/json" in content_type else text
+                ),
             }
     except urllib.error.HTTPError as exc:  # pragma: no cover - depends on runtime
         detail = exc.read().decode("utf-8")

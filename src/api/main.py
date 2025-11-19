@@ -70,7 +70,9 @@ async def health_deps() -> JSONResponse:
 
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(3.0, connect=2.0)) as client:
-            response = await client.get(f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/version")
+            response = await client.get(
+                f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/version"
+            )
         if response.is_success:
             payload["ollama"] = True
         else:  # pragma: no cover - depends on external service

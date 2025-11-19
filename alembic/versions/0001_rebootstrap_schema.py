@@ -27,7 +27,9 @@ def _has_column(inspector: reflection.Inspector, table: str, column: str) -> boo
 def _schema_is_legacy(inspector: reflection.Inspector) -> bool:
     """Detect whether the existing schema was created by the old migrations."""
 
-    if inspector.has_table("users") and not _has_column(inspector, "users", "password_hash"):
+    if inspector.has_table("users") and not _has_column(
+        inspector, "users", "password_hash"
+    ):
         return True
     if inspector.has_table("tenants") and not _has_column(inspector, "tenants", "slug"):
         return True

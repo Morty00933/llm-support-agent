@@ -10,6 +10,7 @@ import sqlalchemy as sa
 try:  # pragma: no cover - optional dependency
     from pgvector.sqlalchemy import Vector
 except ModuleNotFoundError:  # pragma: no cover
+
     class Vector(sa.types.UserDefinedType):
         cache_ok = True
 
@@ -19,6 +20,7 @@ except ModuleNotFoundError:  # pragma: no cover
 
         def get_col_spec(self, **kw):
             return f"vector({self.dim})" if self.dim else "vector"
+
 
 from src.core.config import settings
 
@@ -37,7 +39,9 @@ def upgrade() -> None:
     if "embedding_vector" not in cols:
         op.add_column(
             "kb_chunks",
-            sa.Column("embedding_vector", Vector(dim=settings.EMBEDDING_DIM), nullable=True),
+            sa.Column(
+                "embedding_vector", Vector(dim=settings.EMBEDDING_DIM), nullable=True
+            ),
         )
     if "archived_at" not in cols:
         op.add_column(

@@ -11,6 +11,7 @@ from src.services.integrations.dispatcher import dispatch_ticket_sync
 
 logger = structlog.get_logger(__name__)
 
+
 @celery_app.task(
     bind=True,
     name="agent.sync_ticket",

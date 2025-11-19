@@ -51,7 +51,9 @@ async def _fetch_embedding(
             payload = response.json()
             vector = payload.get("embedding")
             if not isinstance(vector, list):
-                raise EmbeddingServiceError("embedding response did not include vector data")
+                raise EmbeddingServiceError(
+                    "embedding response did not include vector data"
+                )
             if len(vector) != settings.EMBEDDING_DIM:
                 raise EmbeddingServiceError(
                     f"embedding size mismatch: got {len(vector)}, expected {settings.EMBEDDING_DIM}",
@@ -103,10 +105,14 @@ async def embed_texts(
 
     base_url = settings.OLLAMA_BASE_URL.strip()
     if not base_url:
-        raise EmbeddingServiceError("Ollama base URL is not configured", status_code=422)
+        raise EmbeddingServiceError(
+            "Ollama base URL is not configured", status_code=422
+        )
     model = settings.OLLAMA_MODEL_EMBED.strip()
     if not model:
-        raise EmbeddingServiceError("Embedding model name is not configured", status_code=422)
+        raise EmbeddingServiceError(
+            "Embedding model name is not configured", status_code=422
+        )
 
     base = base_url.rstrip("/")
 
