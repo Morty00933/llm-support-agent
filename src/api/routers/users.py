@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.routers.auth import get_current_active_user, User
+from src.api.routers.auth import User
 from src.api.dependencies import require_admin
 from src.core.db import get_db
 from src.core.security import get_password_hash

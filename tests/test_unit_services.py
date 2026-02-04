@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from src.services.agent import AgentService, AgentResponse
 from src.services.embedding import EmbeddingService, SearchResult
 from src.agent.policies import should_escalate, build_system_prompt

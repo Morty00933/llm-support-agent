@@ -52,7 +52,7 @@ class KnowledgeService:
             return existing
         
         # Create new chunk using upsert
-        result = await self.repo.upsert(
+        await self.repo.upsert(
             tenant_id=tenant_id,
             source=source,
             chunks=[{"content": chunk, "metadata": metadata}],

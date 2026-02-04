@@ -24,7 +24,7 @@ jobs:
             dockerfile: Dockerfile.backend
             image-suffix: backend
           - context: frontend
-            dockerfile: frontend/Dockerfile.prod
+            dockerfile: Dockerfile.prod
             image-suffix: frontend
 
     steps:

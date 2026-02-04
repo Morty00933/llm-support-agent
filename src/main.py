@@ -7,12 +7,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from src.core.config import settings
 from src.core.db import get_db, close_db
 from src.core.errors.handlers import setup_exception_handlers
+from src.api.middlewares import RequestLoggingMiddleware, RedisRateLimitMiddleware
 
 from src.api.routers.auth import router as auth_router
 from src.api.routers.tickets import router as tickets_router
@@ -40,8 +42,8 @@ async def lifespan(app: FastAPI):
     ollama = settings.ollama
     logger.info(f"Ollama: {ollama.base_url} (chat: {ollama.model_chat}, embed: {ollama.model_embed})")
 
-    redis = settings.redis
-    logger.info(f"Redis: {redis.host}:{redis.port}/{redis.db}")
+    redis_cfg = settings.redis
+    logger.info(f"Redis: {redis_cfg.host}:{redis_cfg.port}/{redis_cfg.db}")
 
     yield
 
@@ -74,11 +76,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from src.api.middlewares import RequestLoggingMiddleware
 app.add_middleware(RequestLoggingMiddleware)
-
-from redis.asyncio import Redis
-from src.api.middlewares import RedisRateLimitMiddleware
 
 redis_client = Redis.from_url(settings.redis.dsn, decode_responses=False)
 app.add_middleware(

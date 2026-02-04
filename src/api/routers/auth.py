@@ -273,7 +273,7 @@ async def refresh_token(
             raise InvalidTokenException("Invalid token type")
 
         user_id = payload.get("sub")
-        tenant_id = payload.get("tenant_id")
+        # tenant_id available in payload if needed: payload.get("tenant_id")
 
         if not user_id:
             raise InvalidTokenException("Invalid token")

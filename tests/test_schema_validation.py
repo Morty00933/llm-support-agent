@@ -3,23 +3,17 @@ Tests for schema validation
 """
 import pytest
 from pydantic import ValidationError
-from datetime import datetime
 from src.schemas import (
     UserCreate,
     UserLogin,
     UserUpdate,
-    UserResponse,
     TicketCreate,
     TicketUpdate,
-    TicketResponse,
     MessageCreate,
-    MessageResponse,
     ChunkCreate,
-    ChunkResponse,
     SearchQuery,
     Token,
     TenantCreate,
-    TenantResponse,
     FreeformRequest,
     AgentResponseSchema,
     TicketRespondRequest,

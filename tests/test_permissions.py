@@ -1,5 +1,4 @@
 """Tests for role-based access control (RBAC) system."""
-import pytest
 from unittest.mock import MagicMock
 
 from src.core.permissions import (

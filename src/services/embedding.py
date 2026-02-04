@@ -233,7 +233,7 @@ class EmbeddingService:
                 .where(
                     and_(
                         KBChunk.tenant_id == tenant_id,
-                        KBChunk.is_current == True,
+                        KBChunk.is_current.is_(True),
                     )
                 )
                 .limit(100)
@@ -288,7 +288,7 @@ class EmbeddingService:
         stmt = select(KBChunk).where(
             and_(
                 KBChunk.tenant_id == tenant_id,
-                KBChunk.is_current == True,
+                KBChunk.is_current.is_(True),
             )
         )
         

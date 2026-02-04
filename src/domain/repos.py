@@ -5,9 +5,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Sequence
 
-from sqlalchemy import select, update, delete, and_, func, desc, true
+from sqlalchemy import select, update, delete, and_, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import selectinload
 from sqlalchemy.dialects.postgresql import insert
 
@@ -404,9 +403,9 @@ async def upsert_external_ref(
         set_=update_dict
     )
     
-    result = await session.execute(stmt)
+    await session.execute(stmt)
     await session.flush()
-    
+
     ref_result = await session.execute(
         select(TicketExternalRef).where(
             and_(

@@ -1,7 +1,6 @@
 """
 Tests for HTTP errors module
 """
-import pytest
 from src.core.errors.http import (
     HTTPError,
     BadRequestError,

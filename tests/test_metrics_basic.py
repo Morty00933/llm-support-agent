@@ -1,7 +1,6 @@
 """
 Basic tests for Prometheus metrics module
 """
-import pytest
 from src.core.metrics import (
     HTTP_REQUESTS,
     HTTP_LATENCY,

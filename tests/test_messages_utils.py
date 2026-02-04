@@ -1,7 +1,6 @@
 """
 Tests for message formatting utilities
 """
-import pytest
 from src.utils.messages import (
     truncate_message,
     format_conversation_history,

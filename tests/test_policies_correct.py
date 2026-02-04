@@ -1,7 +1,6 @@
 """
 Tests for agent policies - correct implementation
 """
-import pytest
 from src.agent.policies import (
     should_escalate,
     build_system_prompt,

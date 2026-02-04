@@ -1,7 +1,6 @@
 """
 Tests for prompt formatting utilities
 """
-import pytest
 from src.utils.prompt import (
     format_kb_chunk,
     format_kb_context,

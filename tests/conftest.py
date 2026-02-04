@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
-from sqlalchemy import event, text
+from sqlalchemy import event
 
 from src.main import app
 from src.core.db import get_db
@@ -78,7 +78,7 @@ async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 
     async with async_session_maker() as session:
         # Start a nested transaction (savepoint)
-        nested = await connection.begin_nested()
+        await connection.begin_nested()
 
         # Intercept commits to use savepoints instead
         @event.listens_for(session.sync_session, "after_transaction_end")

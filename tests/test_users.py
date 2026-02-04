@@ -297,7 +297,7 @@ class TestKBRoleProtection:
 
         # Create agent user
         user_repo = UserRepository(db_session)
-        agent = await user_repo.create(
+        await user_repo.create(
             tenant_id=test_tenant.id,
             email="kbagent@test.com",
             hashed_password=get_password_hash("Password123"),
