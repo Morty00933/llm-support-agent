@@ -66,13 +66,13 @@ jobs:
           DB_NAME: llm_agent_test
           REDIS_HOST: localhost
           REDIS_PORT: 6379
-          JWT_SECRET: test-secret-key-minimum-32-characters-long-for-security
+          JWT_SECRET: a]8Kp2$mN9xQ4vR7wY1zB5cF3hJ6tL0uE8iO2sA4dG7jM1nP5qT9xV3bU6yW0zC
           CELERY_TASK_ALWAYS_EAGER: true
         run: |
           pytest --cov=src --cov-report=xml --cov-report=html --cov-report=term
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           files: ./coverage.xml
           flags: backend
@@ -107,7 +107,7 @@ jobs:
         run: npm run build
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: frontend-build
           path: frontend/dist/
