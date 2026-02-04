@@ -1,0 +1,266 @@
+# LLM Support Agent - Development Environment
+#
+# Usage:
+#   make dev                    # Start all services
+#   make dev-full               # Start with Celery worker
+#   make dev-gpu                # Start with GPU support
+#
+# Services: postgres, redis, ollama, backend, frontend, celery (optional)
+
+services:
+  # ============================================================
+  # DATABASE
+  # ============================================================
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: llm-support-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-llm_agent}
+      # Performance tuning
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
+      POSTGRES_MAX_CONNECTIONS: 100
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Optional: custom postgresql.conf
+      # - ./config/postgresql.conf:/etc/postgresql/postgresql.conf
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - llm-support-network
+
+  # ============================================================
+  # CACHE
+  # ============================================================
+
+  redis:
+    image: redis:7-alpine
+    container_name: llm-support-redis
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfilename "appendonly.aof"
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - llm-support-network
+
+  # ============================================================
+  # AI/LLM
+  # ============================================================
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: llm-support-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_ORIGINS=*
+    # GPU support can be added via docker-compose.gpu.yml
+    restart: unless-stopped
+    networks:
+      - llm-support-network
+
+  # ============================================================
+  # BACKEND API
+  # ============================================================
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: development
+      args:
+        PYTHON_VERSION: 3.11
+    container_name: llm-support-api
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      # Mount code for hot-reload
+      - .:/app
+      # Exclude caches (optional, for performance)
+      - /app/__pycache__
+      - /app/.pytest_cache
+      - /app/.mypy_cache
+      - /app/.ruff_cache
+    environment:
+      # App config
+      - ENV=${ENV:-dev}
+      - DEBUG=${DEBUG:-true}
+      - APP_NAME=${APP_NAME:-llm-support-agent}
+      - HOST=0.0.0.0
+      - PORT=8000
+
+      # Database
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_NAME=${DB_NAME:-llm_agent}
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-10}
+      - DB_MAX_OVERFLOW=${DB_MAX_OVERFLOW:-20}
+
+      # Redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=${REDIS_DB:-0}
+
+      # Ollama
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL_CHAT=${OLLAMA_MODEL_CHAT:-qwen2.5:3b}
+      - OLLAMA_MODEL_EMBED=${OLLAMA_MODEL_EMBED:-nomic-embed-text}
+      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-120}
+      - OLLAMA_TEMPERATURE=${OLLAMA_TEMPERATURE:-0.2}
+
+      # Security
+      - JWT_SECRET=${JWT_SECRET:-CHANGE_ME_IN_PRODUCTION_use_openssl_rand_hex_32}
+      - JWT_ALG=${JWT_ALG:-HS256}
+      - JWT_EXPIRE_MIN=${JWT_EXPIRE_MIN:-60}
+
+      # CORS
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000}
+
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+
+      # Features
+      - PROMETHEUS_ENABLED=${PROMETHEUS_ENABLED:-true}
+      - DEMO_MODE_ENABLED=${DEMO_MODE_ENABLED:-false}
+      - DEMO_SEED_ON_STARTUP=${DEMO_SEED_ON_STARTUP:-false}
+
+      # Celery
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - CELERY_TASK_ALWAYS_EAGER=${CELERY_TASK_ALWAYS_EAGER:-false}
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - llm-support-network
+
+  # ============================================================
+  # FRONTEND
+  # ============================================================
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: llm-support-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount for hot-reload
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - llm-support-network
+
+  # ============================================================
+  # CELERY WORKER (Optional - use --profile full)
+  # ============================================================
+
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: development
+    container_name: llm-support-celery
+    command: celery -A src.core.celery_app worker --loglevel=info --concurrency=2
+    volumes:
+      - .:/app
+      - /app/__pycache__
+      - /app/.pytest_cache
+    environment:
+      - ENV=${ENV:-dev}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_NAME=${DB_NAME:-llm_agent}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL_CHAT=${OLLAMA_MODEL_CHAT:-qwen2.5:3b}
+      - OLLAMA_MODEL_EMBED=${OLLAMA_MODEL_EMBED:-nomic-embed-text}
+      - JWT_SECRET=${JWT_SECRET:-CHANGE_ME_IN_PRODUCTION_use_openssl_rand_hex_32}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    profiles:
+      - full
+    restart: unless-stopped
+    networks:
+      - llm-support-network
+
+# ============================================================
+# VOLUMES
+# ============================================================
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  ollama_data:
+    driver: local
+
+# ============================================================
+# NETWORKS
+# ============================================================
+
+networks:
+  llm-support-network:
+    driver: bridge
+    name: llm-support-network

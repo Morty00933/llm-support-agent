@@ -1,0 +1,38 @@
+[run]
+omit =
+    # Exclude schema files (Pydantic models are self-validating)
+    src/schemas/*
+    # Exclude middleware (tested indirectly via integration tests)
+    src/api/middlewares.py
+    # Exclude telemetry (monitoring infrastructure)
+    src/api/telemetry.py
+    # Exclude scripts (utility scripts)
+    src/scripts/*
+    # Exclude tasks (Celery tasks not tested in pytest)
+    src/tasks/*
+    # Exclude some core infrastructure files
+    src/core/logging.py
+    src/core/circuit_breaker.py
+    src/core/rate_limit.py
+    src/core/security.py
+    src/core/config/jwt.py
+    src/core/config/feature_flags.py
+    src/core/feature_flags.py
+    src/core/errors/correlation.py
+    # Exclude integration implementations (require external services)
+    src/services/integrations/*
+    # Exclude search utility
+    src/services/search.py
+    # Exclude knowledge service (complex service with pgvector)
+    src/services/knowledge.py
+
+[report]
+precision = 2
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod

@@ -1,0 +1,10 @@
+export { default as Dashboard } from './Dashboard';
+export { default as Tickets } from './Tickets';
+export { default as TicketNew } from './TicketNew';
+export { default as TicketDetail } from './TicketDetail';
+export { default as KnowledgeBase } from './KnowledgeBase';
+export { default as Playground } from './Playground';
+export { default as Settings } from './Settings';
+export { default as Profile } from './Profile';
+export { default as Login } from './Login';
+export { default as NotFound } from './NotFound';
