@@ -66,10 +66,20 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Create nginx cache directory
-RUN mkdir -p /var/cache/nginx && \
-    chown -R nginx:nginx /var/cache/nginx && \
-    chown -R nginx:nginx /usr/share/nginx/html
+# Copy K8s-aware entrypoint (sed-replaces BACKEND_HOST at startup)
+COPY docker-entrypoint-k8s.sh /docker-entrypoint-k8s.sh
+RUN chmod +x /docker-entrypoint-k8s.sh
+
+# Create nginx cache and temp directories (needed at runtime)
+RUN mkdir -p /var/cache/nginx/client_temp \
+             /var/cache/nginx/proxy_temp \
+             /var/cache/nginx/fastcgi_temp \
+             /var/cache/nginx/uwsgi_temp \
+             /var/cache/nginx/scgi_temp \
+             /var/run/nginx \
+    && chown -R root:root /var/cache/nginx \
+    && chmod -R 755 /var/cache/nginx \
+    && chown -R nginx:nginx /usr/share/nginx/html
 
 # Expose port
 EXPOSE 3000
@@ -78,5 +88,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3000 || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Start nginx (default: docker-compose uses "backend", K8s overrides via BACKEND_HOST env)
+ENTRYPOINT []
+CMD ["/docker-entrypoint-k8s.sh"]

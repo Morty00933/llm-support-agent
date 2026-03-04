@@ -1,6 +1,6 @@
 # Infrastructure Documentation
 
-## 📋 Table of Contents
+##  Table of Contents
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
 - [Docker Configuration](#docker-configuration)
@@ -11,7 +11,7 @@
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Development
 
@@ -50,7 +50,7 @@ make monitoring
 
 ---
 
-## 🏗️ Architecture
+##  Architecture
 
 ### Service Overview
 
@@ -86,7 +86,7 @@ make monitoring
 
 ---
 
-## 🐳 Docker Configuration
+##  Docker Configuration
 
 ### Multi-Stage Dockerfiles
 
@@ -153,7 +153,7 @@ Stage 3: production  → Nginx + static files
 
 ---
 
-## 🛠️ Makefile Commands
+##  Makefile Commands
 
 ### Development
 
@@ -320,7 +320,7 @@ FEATURE_DARK_MODE=true                     # Enable dark mode UI
 
 ---
 
-## 🚀 Production Deployment
+##  Production Deployment
 
 ### Prerequisites
 
@@ -480,7 +480,7 @@ find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
 
 ---
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### Common Issues
 

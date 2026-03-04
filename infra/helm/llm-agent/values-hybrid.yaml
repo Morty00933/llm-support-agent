@@ -1,0 +1,8 @@
+# Hybrid mode: infra on host Docker, apps in Minikube
+postgres:
+  enabled: false
+
+infra:
+  external: true
+  postgresHost: host.minikube.internal
+  ollamaHost: host.minikube.internal

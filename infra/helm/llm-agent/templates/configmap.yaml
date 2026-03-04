@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    app.kubernetes.io/name: llm-agent
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+  # Application
+  ENV: {{ .Values.config.env | quote }}
+  DEBUG: {{ .Values.config.debug | quote }}
+  APP_NAME: {{ .Values.config.appName | quote }}
+
+  # Logging
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  LOG_FORMAT: {{ .Values.config.logFormat | quote }}
+
+  # CORS
+  CORS_ORIGINS: {{ .Values.config.corsOrigins | quote }}
+
+  # Features
+  PROMETHEUS_ENABLED: {{ .Values.config.prometheusEnabled | quote }}
+  DEMO_MODE_ENABLED: {{ .Values.config.demoModeEnabled | quote }}
+  DEMO_SEED_ON_STARTUP: {{ .Values.config.demoSeedOnStartup | quote }}
+
+  # Ollama / LLM
+  OLLAMA_BASE_URL: {{ if .Values.infra.external }}"http://{{ .Values.infra.ollamaHost }}:11434"{{ else }}{{ .Values.config.ollamaBaseUrl | quote }}{{ end }}
+  OLLAMA_MODEL_CHAT: {{ .Values.config.ollamaModelChat | quote }}
+  OLLAMA_MODEL_EMBED: {{ .Values.config.ollamaModelEmbed | quote }}
+  OLLAMA_TIMEOUT: {{ .Values.config.ollamaTimeout | quote }}
+  OLLAMA_TEMPERATURE: {{ .Values.config.ollamaTemperature | quote }}
+
+  # Database pool (non-sensitive)
+  DB_POOL_SIZE: {{ .Values.database.poolSize | quote }}
+  DB_MAX_OVERFLOW: {{ .Values.database.maxOverflow | quote }}
